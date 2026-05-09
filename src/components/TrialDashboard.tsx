@@ -38,8 +38,15 @@ import { FixSelectionPanel } from "./FixSelectionPanel";
 import { BeforeAfterComparison } from "./BeforeAfterComparison";
 import { MarkdownExportButton } from "./MarkdownExportButton";
 import { RiskRadarChart } from "./RiskRadarChart";
+import { DebateArena as ArenaHero } from "./debate-arena";
+import {
+  mapAgents,
+  mapProduct,
+  mapTrialSteps,
+  activeStepIndex as computeActiveStepIndex,
+} from "../lib/arenaMapper";
+import { VoiceVerdictButton } from "./VoiceVerdictButton";
 import { RiskFilterBar } from "./RiskFilterBar";
-import { TrialChamber } from "./TrialChamber";
 import { cn } from "../lib/cn";
 
 const ALL_SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
@@ -427,26 +434,129 @@ export function TrialDashboard() {
         onSkip={onSkipFullscreen}
       />
 
-      {/* ===== Full-width chamber hero ===== */}
-      <TrialChamber
-        ref={fullscreen.ref}
-        productName={product.productName}
-        productDescription={product.productDescription}
-        agents={showRetrial ? retrialAgents : initialAgents}
-        risks={showRetrial ? retrialRisks : initialRisks}
-        status={status}
-        verdict={showRetrial ? retrialVerdict : initialVerdict}
-        phase={showRetrial ? "retrial" : "initial"}
-        runControl={runButtonNode}
-        alert={liveAlert}
-        fullscreenControl={fullscreenButtonNode}
-        isFullscreen={fullscreen.isFullscreen}
-        hint={fullscreenHintNode}
-        narrationControl={narrationControlNode}
-        narratingAgent={narrator.state.agentType}
-        narrationProgress={narrator.state.progress}
-        narrationPaused={narrator.state.paused}
-      />
+      {/* ===== Toolbar above the arena (status, run/voice/fullscreen, narration) ===== */}
+      {!fullscreen.isFullscreen && fullscreenHintNode && (
+        <div className="mb-3">{fullscreenHintNode}</div>
+      )}
+
+      {liveAlert && <div className="mb-3">{liveAlert}</div>}
+
+      {/* ===== Full-width Debate Arena hero (toolbar inside so it stays
+              visible in browser fullscreen) ===== */}
+      <section
+        ref={fullscreen.ref as React.RefObject<HTMLElement>}
+        className={cn(
+          "flex flex-col overflow-hidden",
+          fullscreen.isFullscreen
+            ? "h-screen w-screen bg-[#070b14]"
+            : "rounded-3xl border border-cyan-500/15 bg-[#070b14] h-[calc(100vh-240px)] min-h-[480px] max-h-[760px]",
+        )}
+      >
+        {/* Toolbar — always inside the section so it shows in fullscreen */}
+        <div
+          className={cn(
+            "relative z-20 flex items-center justify-between gap-3 flex-wrap shrink-0 border-b border-white/5",
+            fullscreen.isFullscreen ? "px-6 py-3" : "px-4 py-2.5",
+          )}
+        >
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-300">
+              Debate Arena
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-300">
+              <Activity
+                className={cn(
+                  "h-3 w-3",
+                  isRunning
+                    ? "text-accent animate-pulse"
+                    : status === "completed" ||
+                        status === "retrial_completed"
+                      ? "text-risk-low"
+                      : "text-slate-500",
+                )}
+              />
+              {trialStatusLabel}
+            </span>
+            <h2 className="text-sm md:text-base font-semibold tracking-tight truncate">
+              {product.productName}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {narrationControlNode}
+            {runButtonNode}
+            {(showRetrial ? retrialVerdict : initialVerdict) && (
+              <VoiceVerdictButton
+                text={
+                  (showRetrial ? retrialVerdict : initialVerdict)!
+                    .judgeClosingStatement
+                }
+              />
+            )}
+            {fullscreenButtonNode}
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 relative">
+        <ArenaHero
+          embedded
+          mode={fullscreen.isFullscreen ? "fullscreen" : "embedded"}
+          hideControls
+          agents={mapAgents(
+            showRetrial ? retrialAgents : initialAgents,
+            narrator.state.agentType ?? null,
+            !!(showRetrial ? retrialVerdict : initialVerdict) &&
+              (status === "completed" || status === "retrial_completed"),
+            showRetrial ? retrialVerdict : initialVerdict,
+          )}
+          product={mapProduct(
+            product,
+            showRetrial ? retrialRisks : initialRisks,
+            showRetrial ? retrialVerdict : initialVerdict,
+            (() => {
+              const messages = (showRetrial ? retrialAgents : initialAgents)
+                .map((a) => a.message)
+                .filter((m): m is NonNullable<typeof m> => !!m);
+              const active = messages.find(
+                (m) => m.agentType === narrator.state.agentType,
+              );
+              return (
+                active?.keyQuestion ??
+                messages[messages.length - 1]?.keyQuestion ??
+                ""
+              );
+            })(),
+          )}
+          trialSteps={(() => {
+            const steps = mapTrialSteps(
+              showRetrial ? retrialAgents : initialAgents,
+              showRetrial ? retrialVerdict : initialVerdict,
+            );
+            return steps.length > 0
+              ? steps
+              : [
+                  {
+                    activeAgentId: "final_judge",
+                    accusation: "Awaiting opening statements…",
+                  },
+                ];
+          })()}
+          currentStepIndex={(() => {
+            const steps = mapTrialSteps(
+              showRetrial ? retrialAgents : initialAgents,
+              showRetrial ? retrialVerdict : initialVerdict,
+            );
+            const judgeOnStand =
+              !!(showRetrial ? retrialVerdict : initialVerdict) &&
+              (status === "completed" || status === "retrial_completed");
+            return computeActiveStepIndex(
+              steps,
+              narrator.state.agentType ?? null,
+              judgeOnStand,
+            );
+          })()}
+        />
+        </div>
+      </section>
 
       {/* ===== Detailed dashboard below ===== */}
       <div className="space-y-8 mt-8">
