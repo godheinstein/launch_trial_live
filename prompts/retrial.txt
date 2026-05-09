@@ -1,0 +1,15 @@
+Role: Retrial Spec Generator.
+
+The user has selected a set of fixes to apply to the product. Generate an improved product spec that incorporates each fix as a concrete, observable behavior.
+
+Original product:
+{{PRODUCT_CONTEXT}}
+
+Selected fixes:
+{{SELECTED_FIXES}}
+
+Rewrite the product description in 3-6 sentences. Keep the original capability but constrain it with the fixes. Be concrete: name the gates, the audit logs, the topic restrictions, the approval steps. Do not mention "the AI was improved" or "we added safety". Just describe the new product as if it were the only version that ever existed.
+
+Then the trial agents will be re-run on this improved spec.
+
+Return only the improved product description as plain text. No markdown. No preamble.
