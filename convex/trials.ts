@@ -5,7 +5,31 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { AUTONOMY, TRIAL_STATUS } from "./schema";
+
+/* Server-side length caps. Mirror the client form validators in
+ * `src/components/TrialSetupForm.tsx` (do not trust the client). */
+const MAX = {
+  productName: 120,
+  productDescription: 3000,
+  targetUsers: 1000,
+  aiActions: 1500,
+  dataAccessed: 1500,
+  additionalContext: 3000,
+} as const;
+
+function clip(value: string, max: number, field: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`${field} must be a string`);
+  }
+  if (value.length > max) {
+    throw new Error(
+      `${field} is too long (${value.length} chars, max ${max}).`,
+    );
+  }
+  return value.trim();
+}
 
 export const createTrial = mutation({
   args: {
@@ -18,9 +42,48 @@ export const createTrial = mutation({
     additionalContext: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Per-deployment rate limit: 60 trial creations per hour. Keeps an
+    // unauthenticated deployment from being filled up with junk records.
+    const allowed = await ctx.runMutation(internal.rateLimit.tryConsume, {
+      key: "createTrial:global",
+      max: 60,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!allowed) {
+      throw new Error(
+        "Too many trial creations right now. Please wait a moment and try again.",
+      );
+    }
+
+    const productName = clip(args.productName, MAX.productName, "productName");
+    if (productName.length === 0) {
+      throw new Error("productName is required");
+    }
+    const productDescription = clip(
+      args.productDescription,
+      MAX.productDescription,
+      "productDescription",
+    );
+    if (productDescription.length === 0) {
+      throw new Error("productDescription is required");
+    }
+    const targetUsers = clip(args.targetUsers, MAX.targetUsers, "targetUsers");
+    const aiActions = clip(args.aiActions, MAX.aiActions, "aiActions");
+    const dataAccessed = clip(args.dataAccessed, MAX.dataAccessed, "dataAccessed");
+    const additionalContext =
+      args.additionalContext === undefined
+        ? undefined
+        : clip(args.additionalContext, MAX.additionalContext, "additionalContext");
+
     const now = Date.now();
     const trialId = await ctx.db.insert("trials", {
-      ...args,
+      productName,
+      productDescription,
+      targetUsers,
+      aiActions,
+      dataAccessed,
+      autonomyLevel: args.autonomyLevel,
+      additionalContext,
       status: "draft",
       createdAt: now,
       updatedAt: now,

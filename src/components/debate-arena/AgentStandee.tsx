@@ -11,7 +11,20 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import type { ArenaAgent, AgentStatus } from "./mockTrialData";
-import { ArenaSpeechBubble } from "./ArenaSpeechBubble";
+import { ArenaSpeechBubble, type BubbleAlignment } from "./ArenaSpeechBubble";
+
+/** Where the speech bubble should anchor for each agent so it doesn't get
+ *  clipped by the chamber edges. Right-column agents anchor right; left-column
+ *  anchors left; center column stays centered. */
+function bubbleAlignmentFor(agentId: string): BubbleAlignment {
+  if (agentId === "skeptical_investor" || agentId === "prompt_injection") {
+    return "from-right";
+  }
+  if (agentId === "privacy_auditor" || agentId === "malicious_user") {
+    return "from-left";
+  }
+  return "center";
+}
 
 export type ArenaSize = "embedded" | "fullscreen";
 
@@ -102,6 +115,7 @@ export function AgentStandee({
             text={agent.speechBubble}
             accentHex={agent.accentHex}
             size={size}
+            alignment={bubbleAlignmentFor(agent.id)}
           />
         )}
       </AnimatePresence>

@@ -13,7 +13,7 @@ Show the full loop: risky product input, live multi-agent trial, harsh verdict, 
 ## Flow
 
 1. Open the app.
-   - Narration: "Launch Trial Live puts any product or idea on trial before launch — apps, startup ideas, workflows, AI agents — with specialist red-team agents."
+   - Narration: "TrialRun puts any product or idea on trial before launch — apps, startup ideas, workflows, AI agents — with specialist red-team agents."
 
 2. Select or paste the AI email assistant sample.
    - Input: "An AI email assistant that connects to Gmail, reads important emails, drafts replies, and can automatically send responses on behalf of the user."
@@ -45,7 +45,7 @@ Show the full loop: risky product input, live multi-agent trial, harsh verdict, 
    - Narration: "Now the product changes from autonomous sender to supervised drafting assistant."
 
 7. Watch retrial timeline.
-   - Narration: "The same agents rerun the launch trial on the improved spec."
+   - Narration: "The same agents rerun the trial run on the improved spec."
 
 8. Show retrial verdict.
    - Score: 78.
@@ -67,4 +67,4 @@ Use fallback mode if live generation is slow, rate-limited, or unavailable.
 
 ## Closing Line
 
-"Launch Trial Live helps teams find launch blockers, apply concrete fixes, and prove the product is safer before anyone ships it."
+"TrialRun helps teams find launch blockers, apply concrete fixes, and prove the product is safer before anyone ships it."

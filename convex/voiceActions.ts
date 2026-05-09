@@ -2,6 +2,12 @@
 
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { internal } from "./_generated/api";
+
+/** Hard cap on how long a single TTS request can be. Both providers can
+ *  handle longer, but the verdict closing statement is at most a few
+ *  sentences, so anything beyond this is suspicious. */
+const MAX_VOICE_TEXT_CHARS = 2000;
 
 /*
  * Voice synthesis actions.
@@ -159,7 +165,29 @@ async function tryElevenLabs(text: string): Promise<SynthesisResult | null> {
 
 export const synthesizeVerdictVoice = action({
   args: { text: v.string() },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    if (typeof args.text !== "string" || args.text.trim().length === 0) {
+      throw new Error("Voice synthesis requires non-empty text.");
+    }
+    if (args.text.length > MAX_VOICE_TEXT_CHARS) {
+      throw new Error(
+        `Voice text is too long (${args.text.length} chars, max ${MAX_VOICE_TEXT_CHARS}).`,
+      );
+    }
+
+    // Per-deployment rate limit: 60 voice synth calls per hour. Gemini /
+    // ElevenLabs are paid per request, so cap before calling out.
+    const allowed = await ctx.runMutation(internal.rateLimit.tryConsume, {
+      key: "voice:synthesize:global",
+      max: 60,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!allowed) {
+      throw new Error(
+        "Voice synthesis is temporarily limited. Please wait a moment and try again.",
+      );
+    }
+
     const errors: string[] = [];
 
     try {

@@ -196,6 +196,19 @@ async function runJudge(
 export const runTrial = action({
   args: { trialId: v.id("trials") },
   handler: async (ctx, args) => {
+    // Per-deployment rate limit: 30 trial runs per hour. Each run hits the
+    // OpenAI API 6× (5 specialists + judge), so this is a real cost guard.
+    const allowed = await ctx.runMutation(internal.rateLimit.tryConsume, {
+      key: "runTrial:global",
+      max: 30,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!allowed) {
+      throw new Error(
+        "Too many trials in flight. Please wait a moment and try again, or use Demo Mode.",
+      );
+    }
+
     const trial = await ctx.runQuery(internal.trials.getTrialInternal, {
       trialId: args.trialId,
     });
@@ -244,6 +257,19 @@ export const runTrial = action({
 export const runRetrial = action({
   args: { trialId: v.id("trials") },
   handler: async (ctx, args) => {
+    // Same per-deployment cap as runTrial — retrials are equally expensive
+    // (5 specialists + judge + improved-spec rewrite).
+    const allowed = await ctx.runMutation(internal.rateLimit.tryConsume, {
+      key: "runRetrial:global",
+      max: 30,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!allowed) {
+      throw new Error(
+        "Too many retrials in flight. Please wait a moment and try again.",
+      );
+    }
+
     const trial = await ctx.runQuery(internal.trials.getTrialInternal, {
       trialId: args.trialId,
     });

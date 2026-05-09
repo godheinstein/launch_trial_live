@@ -1,6 +1,6 @@
 # Debate Arena UI — Integration Guide
 
-A self-contained, visually cinematic "Debate Arena" component module for **Launch Trial Live**. Six AI agents surround a centered product card in a horseshoe layout, with animated speech bubbles, status badges, and playback controls.
+A self-contained, visually cinematic "Debate Arena" component module for **TrialRun**. Six AI agents surround a centered product card in a horseshoe layout, with animated speech bubbles, status badges, and playback controls.
 
 ---
 

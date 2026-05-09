@@ -8,9 +8,12 @@
  * @module
  */
 
+import type * as agentAssets from "../agentAssets.js";
+import type * as falActions from "../falActions.js";
 import type * as messages from "../messages.js";
 import type * as openai from "../openai.js";
 import type * as prompts from "../prompts.js";
+import type * as rateLimit from "../rateLimit.js";
 import type * as reports from "../reports.js";
 import type * as risks from "../risks.js";
 import type * as runner from "../runner.js";
@@ -25,9 +28,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentAssets: typeof agentAssets;
+  falActions: typeof falActions;
   messages: typeof messages;
   openai: typeof openai;
   prompts: typeof prompts;
+  rateLimit: typeof rateLimit;
   reports: typeof reports;
   risks: typeof risks;
   runner: typeof runner;

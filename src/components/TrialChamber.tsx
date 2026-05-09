@@ -134,7 +134,7 @@ export const TrialChamber = forwardRef<HTMLElement, Props>(function TrialChamber
           <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elevated/60 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300">
               <Gavel className="h-3 w-3" />
-              {phase === "retrial" ? "Retrial Room" : "Launch Trial Room"}
+              {phase === "retrial" ? "Retrial Arena" : "TrialRun Arena"}
             </span>
             <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-300">
               <Activity

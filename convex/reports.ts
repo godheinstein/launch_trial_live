@@ -39,7 +39,7 @@ export const generateReport = mutation({
       .first();
 
     const lines: string[] = [];
-    lines.push(`# Launch Trial Report: ${trial.productName}`);
+    lines.push(`# TrialRun Report: ${trial.productName}`);
     lines.push("");
     lines.push("## Product or Idea Summary");
     lines.push(trial.productDescription);

@@ -14,10 +14,10 @@ export function AppShell() {
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-semibold tracking-tight">
-                Launch Trial Live
+                TrialRun
               </span>
               <span className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                Put your AI on trial
+                Trial run before launch
               </span>
             </div>
           </Link>
@@ -79,7 +79,7 @@ export function AppShell() {
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-slate-500">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6">
-          <span>Launch Trial Live · AIE Hackathon</span>
+          <span>TrialRun · AIE Hackathon</span>
           <span className="inline-flex items-center gap-1.5">
             <Sparkles className="h-3 w-3" />
             built in 7 hours

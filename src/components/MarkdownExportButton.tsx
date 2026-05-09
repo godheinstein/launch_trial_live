@@ -30,7 +30,7 @@ function formatAgentSection(messages: AgentMessage[]): string[] {
 export function buildMarkdown(result: TrialResult): string {
   const lines: string[] = [];
   const t = result.trial;
-  lines.push(`# Launch Trial Report: ${t.productName}`);
+  lines.push(`# TrialRun Report: ${t.productName}`);
   lines.push("");
   lines.push("## Product or Idea Summary");
   lines.push(t.productDescription);

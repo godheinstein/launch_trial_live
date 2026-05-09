@@ -1,6 +1,6 @@
 # Judge Q&A
 
-## What is Launch Trial Live?
+## What is TrialRun?
 
 A real-time multi-agent red-team simulator for any product or idea on its way to launch — apps, startup ideas, workflows, features, AI agents. It evaluates product-level launch risk using specialist agents, then produces a score, verdict, risk cards, fixes, retrial, and exportable report.
 

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
   Play,
   RefreshCw,
   Activity,
-  AlertTriangle,
   ChevronDown,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -46,6 +45,12 @@ import {
   activeStepIndex as computeActiveStepIndex,
 } from "../lib/arenaMapper";
 import { VoiceVerdictButton } from "./VoiceVerdictButton";
+import { LiveModeFailureBanner } from "./LiveModeFailureBanner";
+import { GenerateAgentVisualsButton } from "./GenerateAgentVisualsButton";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import type { GeneratedAgentAsset } from "../lib/arenaMapper";
+import type { AgentType } from "../types";
 import { RiskFilterBar } from "./RiskFilterBar";
 import { cn } from "../lib/cn";
 
@@ -71,6 +76,7 @@ function looksLikeConvexId(id: string | undefined): boolean {
 
 export function TrialDashboard() {
   const { trialId } = useParams<{ trialId: string }>();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isDemoParam = searchParams.get("demo") === "1";
 
@@ -81,6 +87,17 @@ export function TrialDashboard() {
   const live = useLiveTrial(
     useLive ? (trialId as Id<"trials">) : null,
   );
+
+  // Fal-generated agent images, if any have been generated. Empty list when
+  // none exist; the arena mapper falls back to bundled defaults.
+  const rawAssets = useQuery(api.agentAssets.getAll, {}) as
+    | Array<{ agentType: string; imageUrl: string; generatedAt: number }>
+    | undefined;
+  const generatedAssets: GeneratedAgentAsset[] = (rawAssets ?? []).map((a) => ({
+    agentType: a.agentType as AgentType,
+    imageUrl: a.imageUrl,
+    generatedAt: a.generatedAt,
+  }));
 
   const productFromParams: ProductInput = useMemo(
     () => ({
@@ -408,12 +425,27 @@ export function TrialDashboard() {
     />
   );
 
+  const switchToDemoMode = () => {
+    const trialId = `trial-${Date.now().toString(36)}`;
+    const params = new URLSearchParams();
+    params.set("demo", "1");
+    params.set("productName", product.productName);
+    params.set("productDescription", product.productDescription);
+    params.set("targetUsers", product.targetUsers);
+    params.set("aiActions", product.aiActions);
+    params.set("dataAccessed", product.dataAccessed);
+    params.set("autonomyLevel", product.autonomyLevel);
+    if (product.additionalContext)
+      params.set("additionalContext", product.additionalContext);
+    navigate(`/trial/${trialId}?${params.toString()}`);
+  };
+
   const liveAlert =
     useLive && live.actionError ? (
-      <div className="rounded-xl border border-risk-critical/40 bg-risk-critical/5 px-4 py-3 text-sm text-risk-critical flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-        <span>{live.actionError}</span>
-      </div>
+      <LiveModeFailureBanner
+        error={live.actionError}
+        onSwitchToDemo={switchToDemoMode}
+      />
     ) : null;
 
   return (
@@ -483,6 +515,7 @@ export function TrialDashboard() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {narrationControlNode}
+            <GenerateAgentVisualsButton />
             {runButtonNode}
             {(showRetrial ? retrialVerdict : initialVerdict) && (
               <VoiceVerdictButton
@@ -507,6 +540,7 @@ export function TrialDashboard() {
             !!(showRetrial ? retrialVerdict : initialVerdict) &&
               (status === "completed" || status === "retrial_completed"),
             showRetrial ? retrialVerdict : initialVerdict,
+            generatedAssets,
           )}
           product={mapProduct(
             product,

@@ -1,8 +1,8 @@
-# Launch Trial Live
+# TrialRun
 
-Put any product or idea on trial before users, attackers, customers, and judges do.
+Put your idea through a trial run before launch.
 
-A multi-agent red-teaming simulator for product launches — apps, startup ideas, workflows, features, and AI products. Five specialist agents (malicious user, privacy auditor, confused customer, prompt-injection attacker, skeptical investor) prosecute your product or idea. A final judge issues a launch readiness score, top risks, and concrete fixes. Apply the fixes, rerun the trial, watch the score move.
+TrialRun helps builders stress-test any product or idea — apps, startup ideas, workflows, features, AI products — with AI agents that simulate users, attackers, auditors, and judges before launch. Five specialist agents (malicious user, privacy auditor, confused customer, prompt-injection attacker, skeptical investor) prosecute your idea. A final judge issues a launch readiness score, top risks, and concrete fixes. Apply the fixes, rerun the trial, watch the score move.
 
 Built for the AIE Hackathon.
 
@@ -70,8 +70,12 @@ If neither provider is configured, the button shows a quiet "configure key" hint
    ```
 4. Inside the Convex dashboard, set the runtime environment variables (Settings → Environment Variables):
    - `OPENAI_API_KEY` — required for the agent calls.
-   - `ELEVENLABS_API_KEY` — optional; enables the voice verdict server-side.
-   - `GEMINI_API_KEY` — optional; reserved for the Gemini voice provider (TODO).
+   - `GEMINI_API_KEY` — primary voice provider for the verdict.
+   - `ELEVENLABS_API_KEY` — fallback voice provider.
+   - `FAL_KEY` — optional; enables the **Generate agent visuals** button on
+     the trial dashboard, which renders six cinematic character standees via
+     Fal (`fal-ai/flux/schnell`) and stores their URLs in the `agentAssets`
+     Convex table. Server-only; the key never touches the browser.
 5. Wire the client to live data: replace the `useTrialEngine` import in `src/components/TrialDashboard.tsx` with the live hook described in `src/lib/useLiveTrial.ts`.
 6. Run the app:
    ```bash
@@ -161,6 +165,86 @@ npm run build
 ```
 
 Passes TypeScript and Vite production build cleanly. Output in `dist/`.
+
+## Deploy to Vercel
+
+The repo ships a [`vercel.json`](./vercel.json) with the right SPA rewrites
+(every path → `/index.html`) and a sensible default header pack
+(`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+`X-Frame-Options: SAMEORIGIN`, `Permissions-Policy` denying camera/geolocation
+and limiting microphone access to `self`).
+
+1. **Connect the repo** in the Vercel dashboard. Framework auto-detects as
+   Vite. Build command `npm run build`, output `dist`.
+2. **Set environment variables** in Vercel → Settings → Environment Variables.
+   Only the public Convex URL is needed for the browser bundle:
+
+   | Vercel env var      | Value                                | Notes                                |
+   | ------------------- | ------------------------------------ | ------------------------------------ |
+   | `VITE_CONVEX_URL`   | `https://<your>.convex.cloud`        | **Public** — baked into the JS bundle |
+
+   Do **not** set `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`,
+   or `FAL_KEY` on Vercel. Those are server-only secrets and live in the
+   **Convex dashboard** → Settings → Environment Variables (see "Live mode"
+   section above). They're consumed by Convex actions, not the browser.
+
+3. **Optional browser-only voice keys** (demo deploys only):
+   `VITE_ELEVENLABS_API_KEY` is supported as a *demo fallback* when no Convex
+   deployment is configured. Note: any `VITE_*` variable is **embedded into
+   the static JS bundle and visible to anyone**. Don't set this on a public
+   deployment unless you accept that risk.
+
+4. **Push to main** → Vercel rebuilds automatically. The first deploy needs
+   `npx convex deploy` once locally to push the schema/functions to your
+   Convex production deployment, then update Vercel's `VITE_CONVEX_URL` to
+   point at the production URL.
+
+## Security & abuse-prevention
+
+This deployment is publicly reachable and has **no user authentication** —
+trial IDs are unguessable Convex document IDs (random 32-char strings) and
+function as bearer tokens. The following safeguards are in place:
+
+- **Server-side input validation** in `convex/trials.ts::createTrial` —
+  required-field checks and per-field length caps (`productName ≤ 120`,
+  `productDescription ≤ 3000`, …). Mirrors the client form so a custom
+  Convex client can't bypass it.
+- **Per-deployment rate limits** (sliding window, persisted in the
+  `rateLimits` table — see `convex/rateLimit.ts`):
+  - `createTrial` — 60 / hour
+  - `runTrial`, `runRetrial` — 30 / hour each
+  - `falActions.generateAll` — 6 / hour (each run = 6 Fal images)
+  - `voiceActions.synthesizeVerdictVoice` — 60 / hour, with a 2 000-char
+    text cap on the input
+- **Secret hygiene** — server-only keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`,
+  `ELEVENLABS_API_KEY`, `FAL_KEY`) are read by Convex actions via
+  `process.env.*` and never exposed to the browser. The `VITE_*` voice keys
+  are explicitly marked as demo-only with comments in `.env.example`.
+- **Frontend error containment** — `<ErrorBoundary>` wraps the trial
+  dashboard so a render-time crash falls back to a stack panel instead of a
+  blank screen. The `<LiveModeFailureBanner>` translates raw provider
+  errors into a friendly "tokens on a coffee break" UX with a one-click
+  switch to Demo Mode.
+- **No `dangerouslySetInnerHTML`, `eval`, or `Function` constructors**
+  anywhere in the codebase (verified via grep).
+- **Prompt injection** — all user input flows into structured-output OpenAI
+  calls with explicit role separation in `convex/prompts.ts` (system prompt
+  vs. product description). Model output is parsed with strict JSON
+  schemas before being persisted; an injected payload can at worst alter
+  the verdict text, never trigger privileged actions.
+
+### Known limitations / TODOs
+
+- **No authentication.** Anyone with a trial ID can read its data and
+  toggle `selectedForFix` flags via `risks.toggleRiskFix`. Acceptable for
+  the hackathon demo (IDs are unguessable random strings) but should be
+  replaced with proper auth (Convex Auth, Clerk, etc.) before any
+  production use. Mark as TODO.
+- **Trial ownership** — there's no `userId` field on trials yet, so we
+  can't enforce horizontal-isolation checks server-side. Add when auth
+  lands.
+- **Convex CORS** is managed by Convex itself; the function endpoints only
+  accept calls from clients carrying the deployment URL.
 
 ## Hackathon non-goals
 

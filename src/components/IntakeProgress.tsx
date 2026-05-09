@@ -25,7 +25,7 @@ export function IntakeProgress({
   return (
     <div className="w-full">
       <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-slate-400 mb-2">
-        <span>Build your launch trial</span>
+        <span>Set up your trial run</span>
         <span>
           {reviewing ? "Review" : `Step ${current + 1} of ${total}`}
         </span>

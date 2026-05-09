@@ -118,7 +118,7 @@ export function VoiceVerdictButton({ text, className }: Props) {
     );
     if (realFailures.length === 0) {
       setErrorMessage(
-        "Voice unavailable — set ELEVENLABS_API_KEY in Convex env (or VITE_ELEVENLABS_API_KEY locally) to enable.",
+        "Voice unavailable — set GEMINI_API_KEY (primary) or ELEVENLABS_API_KEY (fallback) in Convex env to enable.",
       );
     } else {
       const last = realFailures[realFailures.length - 1];
@@ -136,7 +136,7 @@ export function VoiceVerdictButton({ text, className }: Props) {
           "inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elevated/40 px-3 py-1.5 text-xs text-slate-500",
           className,
         )}
-        title="Set ELEVENLABS_API_KEY in Convex env or VITE_ELEVENLABS_API_KEY locally to enable"
+        title="Set GEMINI_API_KEY (primary) or ELEVENLABS_API_KEY (fallback) in Convex env to enable"
       >
         <Volume2 className="h-3 w-3" />
         Voice verdict (configure key)

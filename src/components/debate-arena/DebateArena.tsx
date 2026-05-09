@@ -201,7 +201,7 @@ export function DebateArena({
             </div>
             <div>
               <h1 className="text-xs font-bold text-slate-100 tracking-tight">
-                Launch Trial Live
+                TrialRun
               </h1>
               <p className="text-[8px] font-mono text-slate-500 uppercase tracking-[0.2em]">
                 Debate Arena

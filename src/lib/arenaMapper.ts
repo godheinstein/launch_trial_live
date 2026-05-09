@@ -57,16 +57,24 @@ function statusAdapter(
   return "waiting";
 }
 
+export interface GeneratedAgentAsset {
+  agentType: AgentType;
+  imageUrl: string;
+  generatedAt?: number;
+}
+
 /**
  * Build the six ArenaAgents from live trial state. Each agent's visual
- * config (image, color, name) comes from the bundled defaults; we only
- * override `status`, `speechBubble`, and `severity`.
+ * config (color, name, default image) comes from the bundled defaults; we
+ * override `status`, `speechBubble`, `severity`, and (when supplied)
+ * `imageUrl` from Fal-generated assets.
  */
 export function mapAgents(
   agentRunStates: AgentRunState[],
   activeAgent: AgentType | null,
   judgeOnStand: boolean,
   verdict: Verdict | undefined,
+  generatedAssets?: GeneratedAgentAsset[],
 ): ArenaAgent[] {
   return Object.values(ARENA_DEFAULTS_BY_ID).map((defaults) => {
     const domainType = toDomainType(defaults.id);
@@ -81,8 +89,15 @@ export function mapAgents(
           ? getBubbleText(message, domainType, undefined) ?? message.headline ?? defaults.speechBubble
           : defaults.speechBubble;
 
+    // Priority: generated Fal asset → bundled CDN/static → built-in default.
+    const generated = generatedAssets?.find(
+      (a) => a.agentType === domainType,
+    );
+    const imageUrl = generated?.imageUrl ?? defaults.imageUrl;
+
     return {
       ...defaults,
+      imageUrl,
       status: statusAdapter(domainType, agentRunStates, activeAgent, judgeOnStand),
       speechBubble: speech,
       severity: message?.severity

@@ -116,4 +116,33 @@ export default defineSchema({
     markdown: v.string(),
     createdAt: v.number(),
   }).index("by_trial", ["trialId"]),
+
+  /**
+   * Sliding-window rate limits keyed by `key` (e.g. "runTrial:global" or
+   * "fal:generateAll:global"). One row per key; mutations atomically
+   * increment within the active window or reset when expired. Lets us
+   * cap expensive provider calls without an external Redis.
+   */
+  rateLimits: defineTable({
+    key: v.string(),
+    /** Window start in epoch ms. */
+    windowStart: v.number(),
+    /** Calls in this window. */
+    count: v.number(),
+  }).index("by_key", ["key"]),
+
+  /**
+   * Optional Fal-generated character images, one row per agentType. Used by
+   * the Debate Arena to upgrade the bundled CDN/silhouette default. Falls
+   * back gracefully when missing.
+   */
+  agentAssets: defineTable({
+    agentType: AGENT_TYPE,
+    imageUrl: v.string(),
+    /** Prompt used at generation time, useful for debugging. */
+    prompt: v.string(),
+    /** Optional Fal request id / model id for traceability. */
+    sourceRef: v.optional(v.string()),
+    generatedAt: v.number(),
+  }).index("by_agentType", ["agentType"]),
 });

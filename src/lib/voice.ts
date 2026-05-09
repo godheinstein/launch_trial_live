@@ -1,10 +1,14 @@
 /*
  * Voice provider abstraction.
  *
+ * Provider chain (priority order, applies on both Convex and browser paths):
+ *   1. Gemini Voice (primary)  — wired in convex/voiceActions.ts; browser-side
+ *      stub returns null so the chain falls through to ElevenLabs.
+ *   2. ElevenLabs (fallback)   — fully wired on both paths.
+ *
  * In live mode the button calls the Convex action `voiceActions.synthesizeVerdictVoice`
  * which keeps API keys server-side. In demo-only mode (no Convex) the button
- * falls back to the browser-side providers below — Gemini (TODO) then ElevenLabs.
- * The trial flow never blocks on voice.
+ * walks this same browser-side chain. The trial flow never blocks on voice.
  */
 
 export type VoiceProviderId = "gemini" | "elevenlabs";
