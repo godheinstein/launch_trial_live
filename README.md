@@ -1,255 +1,267 @@
 # TrialRun
 
-Put your idea through a trial run before launch.
+> **Put your idea through a trial run before launch.**
 
-TrialRun helps builders stress-test any product or idea — apps, startup ideas, workflows, features, AI products — with AI agents that simulate users, attackers, auditors, and judges before launch. Five specialist agents (malicious user, privacy auditor, confused customer, prompt-injection attacker, skeptical investor) prosecute your idea. A final judge issues a launch readiness score, top risks, and concrete fixes. Apply the fixes, rerun the trial, watch the score move.
+TrialRun helps builders stress-test any product or idea with AI agents that simulate users, attackers, auditors, and judges before launch.
 
-Built for the AIE Hackathon.
+---
 
-## Stack
+**Live app:** https://launchtriallive.vercel.app/
+**Demo video:** _coming soon_ &nbsp;·&nbsp; **Hackathon:** AIE Hackathon
 
-- **Frontend**: Vite + React + TypeScript + Tailwind CSS
-- **Backend**: Convex (real-time DB, server functions, actions)
-- **AI**: OpenAI GPT-5.5 with structured outputs (per-agent JSON schema)
-- **Optional**: ElevenLabs (voice verdict), Fal/GPT Image 2 (verdict poster)
+---
 
-## Quick start (demo mode, no API keys)
+## The problem
 
-Demo mode replays a pre-written email-assistant trial that scores 42, then rises to 78 after applied fixes. No backend needed.
+Builders ship fast and miss the obvious. Code linters tell you the syntax is fine; they don't tell you a malicious user can ventriloquize your auto-replies, that your data flows fail GDPR, that your "important email" classifier will silently send a wire-transfer reply to a phishing email. Real launch risk lives at the **product** level, and you only find it when users, attackers, regulators, or investors find it for you — usually after launch.
+
+## The solution
+
+A live courtroom for product ideas. Six AI agents prosecute your description from six different angles, raise specific risk cards with severity, and a final judge issues a launch readiness score from 0 to 100. You pick the fixes you want to apply, click **Run retrial**, and the score moves. Export the verdict as a Markdown report.
+
+## Core demo flow
+
+```
+  Enter idea  →  Six agents debate it live  →  Risk cards + verdict score
+                                                       │
+  Improved score  ←  Rerun trial  ←  Select fixes  ◄───┘
+        │
+        └──►  Export report
+```
+
+## Example demo scenario (the 42 → 78 arc)
+
+The default demo is **Meeting Agent** — an AI assistant that joins Zoom/Meet calls, transcribes them, extracts action items, and auto-emails follow-ups to attendees.
+
+1. Initial verdict: **42 / 100 — Needs fixes before launch.**
+   - Critical: meeting consent unclear for external attendees.
+   - Critical: auto-send follow-ups can misrepresent decisions made in the call.
+   - High: prompt-injection via meeting chat / shared docs.
+   - High: indefinite transcript retention.
+2. User picks 4 fixes from the checklist (consent gate, draft-then-approve, redaction, retention policy).
+3. Retrial agents re-prosecute the improved spec.
+4. Retrial verdict: **78 / 100 — Safe-to-demo with monitoring.**
+5. **Export Markdown** → ready to drop in the team wiki or PR description.
+
+## The six AI agents
+
+| # | Agent | What they prosecute |
+|---|---|---|
+| 1 | **Malicious User** | Abuse vectors, fraud, impersonation, ToS exploitation |
+| 2 | **Privacy Auditor** | Data flows, consent, GDPR / CCPA, scope creep |
+| 3 | **Confused Customer** | UX clarity, dark patterns, recovery from mistakes |
+| 4 | **Prompt Injection Attacker** | Indirect prompt injection, tool hijacking, exfil |
+| 5 | **Skeptical Investor** | Moat, unit economics, ICP wedge, demo defensibility |
+| 6 | **Final Judge** | Synthesises a verdict, score, top risks, recommended fixes, judge closing statement |
+
+Each agent has a distinct system prompt ([`convex/prompts.ts`](./convex/prompts.ts)) and runs as a separate OpenAI call with structured JSON output. The judge runs last and consumes all five specialists' findings.
+
+## Why AI is central — not bolted on
+
+This is not a chatbot wrapper. AI is the entire product surface:
+
+- **Reasoning.** The judgment, the risk cards, the severity ratings, the fix recommendations, and the retrial spec rewrite all come from OpenAI structured outputs against fixed JSON schemas (`AGENT_RESPONSE_SCHEMA`, `VERDICT_RESPONSE_SCHEMA`). No hand-written rules.
+- **Multi-agent orchestration.** Five role-specific specialists run sequentially in a Convex action ([`convex/runner.ts`](./convex/runner.ts)), each with isolated system instructions. The judge synthesises across them. Retrial uses a separate spec-rewrite prompt to fold in the user's selected fixes.
+- **Voice.** The closing statement is spoken via Gemini Voice ([`convex/voiceActions.ts`](./convex/voiceActions.ts)) — the verdict is the moment that should *sound* like a verdict.
+- **Visuals.** The Debate Arena's six character standees are generated by Fal ([`convex/falActions.ts`](./convex/falActions.ts)) — six prompts, six characters, real-time on demand.
+- **Prompt-injection awareness.** Because *we evaluate* prompt-injection risk, our own architecture treats the user's product description as untrusted data, separates it from system instructions, and validates structured output before persisting.
+
+## Sponsor integrations
+
+Only listing tracks actually wired into the working demo:
+
+| Track | What we use | Where to find it |
+|---|---|---|
+| **OpenAI** | Multi-agent reasoning, structured risk cards, fixes, and final verdicts (gpt-5.5 with gpt-4o fallback). Structured JSON outputs against fixed schemas. | [`convex/runner.ts`](./convex/runner.ts) · [`convex/openai.ts`](./convex/openai.ts) · [`convex/prompts.ts`](./convex/prompts.ts) |
+| **Convex** | Live trial state, sessions, agent messages, risks, verdicts, retrials, reports, agent-asset URLs, rate limits. Reactive queries drive the live UI. | [`convex/schema.ts`](./convex/schema.ts) · [`convex/runner.ts`](./convex/runner.ts) · [`convex/messages.ts`](./convex/messages.ts) · [`convex/risks.ts`](./convex/risks.ts) · [`convex/verdicts.ts`](./convex/verdicts.ts) · [`convex/reports.ts`](./convex/reports.ts) |
+| **Gemini Voice** | Primary TTS for the judge's closing statement (`gemini-2.5-flash-preview-tts`, voice "Kore"). Server wraps PCM in WAV before returning base64. | [`convex/voiceActions.ts`](./convex/voiceActions.ts) · [`src/components/VoiceVerdictButton.tsx`](./src/components/VoiceVerdictButton.tsx) |
+| **Fal** | Six cinematic character standees rendered via `fal-ai/flux/schnell`, persisted to Convex, overlaid onto the arena. | [`convex/falActions.ts`](./convex/falActions.ts) · [`src/components/GenerateAgentVisualsButton.tsx`](./src/components/GenerateAgentVisualsButton.tsx) · [`src/lib/arenaMapper.ts`](./src/lib/arenaMapper.ts) |
+| **Vercel** | Deployed at https://launchtriallive.vercel.app/ — Vite static SPA + Convex backend; SPA rewrites in [`vercel.json`](./vercel.json), security headers preset. | [`vercel.json`](./vercel.json) |
+
+ElevenLabs is wired as the voice fallback when Gemini misses (same call site, transparent to the user).
+
+## Architecture
+
+```
+                  ┌────────────────────────────────────────┐
+                  │             React + Vite SPA            │
+                  │  (Vercel static hosting + SPA rewrite)  │
+                  └────────────────┬───────────────────────┘
+                                   │  Convex client (websocket)
+                                   ▼
+       ┌───────────────────────────────────────────────────────────┐
+       │                       Convex backend                       │
+       │  ┌──────────────────┐   ┌──────────────────────────────┐ │
+       │  │  Reactive queries │   │       Convex actions         │ │
+       │  │ trials, messages, │   │  runTrial / runRetrial       │─┼──► OpenAI
+       │  │ risks, verdicts,  │◄──│  generateAll (Fal)           │─┼──► Fal
+       │  │ reports, assets   │   │  synthesizeVerdictVoice      │─┼──► Gemini → ElevenLabs
+       │  └──────────────────┘   │  rateLimit / schemas          │ │
+       │                          └──────────────────────────────┘ │
+       └───────────────────────────────────────────────────────────┘
+```
+
+Demo mode short-circuits Convex entirely: a deterministic event emitter ([`src/demo/runDemoMode.ts`](./src/demo/runDemoMode.ts)) replays the 42 → 78 arc from a bundled JSON file with realistic agent timing, so judges can see the full demo without API keys.
+
+## Tech stack
+
+- **Frontend:** Vite + React 18 + TypeScript + Tailwind CSS + Framer Motion + lucide-react
+- **Backend:** Convex (reactive DB, queries, mutations, Node actions)
+- **AI:** OpenAI (gpt-5.5 / gpt-4o), Gemini Voice (gemini-2.5-flash-preview-tts), ElevenLabs (eleven_multilingual_v2 fallback), Fal (fal-ai/flux/schnell)
+- **Deploy:** Vercel (SPA) + Convex Cloud (backend)
+- **Misc:** Web Speech API for voice input on the intake form (browser-native, no backend), Web Fullscreen API for the cinematic Debate Arena.
+
+## Local setup
 
 ```bash
+git clone <this repo>
 cd launch-trial-live
 npm install
+cp .env.example .env.local
+
+# Boot Convex (creates convex/_generated/, prints VITE_CONVEX_URL)
+npx convex dev
+
+# In a second terminal:
 npm run dev
 ```
 
-Open http://localhost:5173 → click **Run demo product** → watch the trial.
+Open http://localhost:5173. With no keys configured, **Run demo product** still works end-to-end via the deterministic replay.
 
-The header chip shows `demo` when `VITE_CONVEX_URL` is unset, `live` when it is.
+To enable **live mode** (real agents, real voice, real character art), set the following in the **Convex dashboard** → Settings → Environment Variables:
 
-## Voice verdict (optional polish)
+| Variable | Required for | Notes |
+|---|---|---|
+| `OPENAI_API_KEY` | The trial agents | server-only |
+| `GEMINI_API_KEY` | Primary voice verdict | server-only |
+| `ELEVENLABS_API_KEY` | Voice verdict fallback | server-only |
+| `FAL_KEY` | "Generate agent visuals" button | server-only |
 
-The judge's closing statement can be spoken via the **Play voice verdict** button on the verdict card. Voice is opt-in and never blocks the trial flow. Provider chain (first match wins):
+…and confirm them with `npx convex env list`.
 
-1. **Gemini Voice** — *TODO*. Provider interface is in place; actual call is stubbed because Gemini's TTS API isn't yet a simple browser-side REST endpoint. Wire it server-side via Convex once available.
-2. **ElevenLabs** — fully working. Set either:
-   - `VITE_ELEVENLABS_API_KEY` in `.env.local` to call from the browser (simplest for local demo), or
-   - `ELEVENLABS_API_KEY` in the Convex dashboard to keep the key server-side (recommended for shared deploys).
+## Environment variables
 
-If neither provider is configured, the button shows a quiet "configure key" hint instead of an error. Demo mode never requires voice.
+Stored in `.env.local` (browser-side only):
 
-## Live mode (Convex + OpenAI)
+| Variable | Purpose | Exposed to browser? |
+|---|---|---|
+| `VITE_CONVEX_URL` | Convex deployment URL | Yes (intentional) |
+| `CONVEX_DEPLOYMENT` | Convex CLI target | No |
 
-> **Note:** the Convex CLI requires Node 20+. Demo mode works on Node 18.
+All AI provider keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`, `FAL_KEY`) live in the **Convex dashboard**, not on Vercel and not in `.env.local`. They never reach the browser bundle.
 
-1. Install Node 22 LTS (https://nodejs.org). Open a fresh terminal.
-2. Copy env file and fill keys:
-   ```bash
-   cp .env.example .env.local
-   # then edit .env.local
-   ```
-   `.env.local` should contain:
-   ```env
-   # Convex
-   VITE_CONVEX_URL=
-   CONVEX_DEPLOYMENT=
+The `VITE_ELEVENLABS_API_KEY` / `VITE_GEMINI_API_KEY` slots in `.env.example` exist purely as a demo-only browser fallback and are clearly flagged as risky — leave them empty for any non-hackathon deployment. (Verified clean: no server-only key in the codebase uses the `VITE_` prefix.)
 
-   # Convex runtime env (set in dashboard, not in .env.local)
-   OPENAI_API_KEY=
-   ELEVENLABS_API_KEY=
-   GEMINI_API_KEY=
-   FAL_KEY=
+## Demo mode
 
-   # Browser-side voice fallbacks (optional, demo-only)
-   VITE_ELEVENLABS_API_KEY=
-   VITE_GEMINI_API_KEY=
-   ```
-3. Initialize Convex (this generates `convex/_generated/` and populates `VITE_CONVEX_URL`):
-   ```bash
-   npx convex dev
-   ```
-4. Inside the Convex dashboard, set the runtime environment variables (Settings → Environment Variables):
-   - `OPENAI_API_KEY` — required for the agent calls.
-   - `GEMINI_API_KEY` — primary voice provider for the verdict.
-   - `ELEVENLABS_API_KEY` — fallback voice provider.
-   - `FAL_KEY` — optional; enables the **Generate agent visuals** button on
-     the trial dashboard, which renders six cinematic character standees via
-     Fal (`fal-ai/flux/schnell`) and stores their URLs in the `agentAssets`
-     Convex table. Server-only; the key never touches the browser.
-5. Wire the client to live data: replace the `useTrialEngine` import in `src/components/TrialDashboard.tsx` with the live hook described in `src/lib/useLiveTrial.ts`.
-6. Run the app:
-   ```bash
-   npm run dev
-   ```
+Demo mode is the safety net for the demo:
 
-## File layout
+- Activated automatically by `?demo=1` in the URL or by clicking **Run demo product** on the landing page.
+- Replays a prewritten Meeting Agent trial (42 → 78) with realistic agent-by-agent timing.
+- Works without any API keys, Convex deployment, or network access to providers.
+- All UI features still function: agent timeline, severity filter, fix selection, retrial flow, Markdown export, fullscreen, narration controls. Only voice and Fal-generated visuals require keys.
+
+If live mode hits a token/rate-limit issue, the dashboard shows a friendly "agents took a coffee break" banner with a one-click **Switch to Demo Mode** button that replays the same product idea through the demo runner.
+
+## Security & reliability notes
+
+- **No authentication** today. Trial IDs are unguessable Convex document IDs (random 32-char strings) and act as bearer tokens. Acceptable for a hackathon demo; documented as a TODO before any production use.
+- **Server-side input validation** on `createTrial` (length caps, required-field checks) — mirrors the client form so a custom Convex client cannot bypass it.
+- **Server-side rate limits** ([`convex/rateLimit.ts`](./convex/rateLimit.ts)) on every expensive provider call:
+  - `createTrial`: 60/hr · `runTrial`/`runRetrial`: 30/hr each · `generateAll` (Fal): 6/hr · `synthesizeVerdictVoice`: 60/hr
+- **No `dangerouslySetInnerHTML`, `eval`, or `Function` constructors** anywhere in the codebase (verified via grep).
+- **React error boundary** around `<TrialDashboard>` so a render crash falls back to a stack panel instead of a blank screen.
+- **Friendly failure UX** — `<LiveModeFailureBanner />` translates raw provider errors into a coffee-break message + Switch-to-Demo button.
+- **Vercel security headers** preset in [`vercel.json`](./vercel.json): `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`.
+- **Prompt-injection containment** — user product description and system instructions are explicitly separated in [`convex/prompts.ts`](./convex/prompts.ts); model output is parsed with strict JSON schemas before persisting.
+
+## Project structure
 
 ```
 launch-trial-live/
-├── prompts/                       # PRD §18 system + role prompts (also embedded in convex/prompts.ts)
-├── convex/
-│   ├── schema.ts                  # PRD §15 data model
-│   ├── trials.ts                  # createTrial, getTrial, getRecentTrials, internal queries
-│   ├── messages.ts                # agentMessages insert + query
-│   ├── risks.ts                   # riskCards insert, query, toggleRiskFix
-│   ├── verdicts.ts                # verdicts insert + query
-│   ├── reports.ts                 # generateReport (markdown), getLatestReport
-│   ├── prompts.ts                 # SHARED_SYSTEM, agent prompts, JSON schemas (§17)
-│   ├── openai.ts                  # GPT-5.5 structured-output client (Node runtime)
-│   ├── voiceActions.ts            # ElevenLabs synthesis (Gemini TODO) — Node runtime
-│   └── runner.ts                  # runTrial / runRetrial actions (Node runtime)
-└── src/
-    ├── App.tsx                    # router /, /new, /trial/:trialId
-    ├── main.tsx                   # ConvexProvider when VITE_CONVEX_URL set
-    ├── types.ts                   # PRD-aligned domain types
-    ├── lib/
-    │   ├── agents.ts              # six agent metadata
-    │   ├── scoring.ts             # severity weights, verdict labels (§19)
-    │   ├── cn.ts                  # clsx + tailwind-merge
-    │   ├── convexClient.ts        # ConvexReactClient (auto-detect)
-    │   ├── useTrialEngine.ts      # demo-mode driver
-    │   ├── useLiveTrial.ts        # live-mode wiring stub (post-codegen)
-    │   └── voice.ts               # voice provider chain (Gemini stub → ElevenLabs)
-    ├── demo/
-    │   ├── sampleInputs.ts        # AutoReply AI, Meeting Agent, AI Recruiter
-    │   ├── sampleTrialResult.json # full 42 → 78 demo arc
-    │   └── runDemoMode.ts         # event-driven replay
-    └── components/
-        ├── AppShell.tsx
-        ├── LandingPage.tsx
-        ├── TrialSetupForm.tsx
-        ├── TrialDashboard.tsx
-        ├── AgentTimeline.tsx
-        ├── AgentCard.tsx
-        ├── RiskCard.tsx
-        ├── RiskSeverityBadge.tsx
-        ├── RiskFilterBar.tsx
-        ├── RiskRadarChart.tsx
-        ├── VerdictPanel.tsx
-        ├── FixSelectionPanel.tsx
-        ├── BeforeAfterComparison.tsx
-        ├── MarkdownExportButton.tsx
-        └── VoiceVerdictButton.tsx
+├── convex/                              ← backend (Convex)
+│   ├── schema.ts                          PRD §15 tables + rateLimits + agentAssets
+│   ├── runner.ts                          ★ multi-agent orchestrator (OpenAI)
+│   ├── openai.ts                          ★ structured-output OpenAI client
+│   ├── prompts.ts                         system prompts + JSON schemas (§17)
+│   ├── voiceActions.ts                    ★ Gemini → ElevenLabs voice
+│   ├── falActions.ts                      ★ Fal character-art generation
+│   ├── agentAssets.ts                     persisted Fal URLs
+│   ├── rateLimit.ts                       sliding-window limit primitive
+│   ├── trials.ts · messages.ts ·
+│   ├── risks.ts · verdicts.ts ·
+│   ├── reports.ts                         CRUD + Markdown export
+│   └── _generated/                        auto from `npx convex dev`
+├── src/
+│   ├── App.tsx                            router (/, /new, /trial/:id, /arena-preview)
+│   ├── main.tsx                           ConvexProvider bootstrap
+│   ├── components/
+│   │   ├── LandingPage.tsx                hero + Powered-by sponsor cards
+│   │   ├── TrialSetupForm.tsx             7-step guided intake (Web Speech voice input)
+│   │   ├── TrialDashboard.tsx             top-level trial page
+│   │   ├── TrialChamber.tsx               cinematic chamber wrapper (toolbar + arena)
+│   │   ├── debate-arena/                  ★ Debate Arena module (3-row courtroom)
+│   │   │   ├── DebateArena.tsx              embedded + fullscreen modes
+│   │   │   ├── AgentStandee.tsx             character cards w/ image fallback chain
+│   │   │   ├── ArenaSpeechBubble.tsx        directional bubbles per column
+│   │   │   └── ProductOnTrialCenter.tsx     score ring + accusation
+│   │   ├── VoiceVerdictButton.tsx         ★ Gemini → ElevenLabs button
+│   │   ├── GenerateAgentVisualsButton.tsx ★ Fal generation trigger
+│   │   ├── BrandLogos.tsx                 inline SVG sponsor marks
+│   │   ├── LiveModeFailureBanner.tsx      coffee-break fallback
+│   │   ├── FullscreenButton/Hint/Prompt.tsx
+│   │   └── … RiskCard, FixSelectionPanel, BeforeAfterComparison, etc.
+│   ├── lib/
+│   │   ├── useTrialEngine.ts              demo-mode state machine
+│   │   ├── useLiveTrial.ts                Convex live-mode hook
+│   │   ├── useNarrationController.ts      per-agent timing controller
+│   │   ├── arenaMapper.ts                 ★ live state → Debate Arena props (Fal overlay)
+│   │   ├── voice.ts                       browser-side voice provider chain
+│   │   └── useFullscreen.ts               Web Fullscreen API
+│   └── demo/
+│       ├── runDemoMode.ts                 ★ deterministic demo replay
+│       ├── sampleInputs.ts                three sample products
+│       └── sampleTrialResult.json         the 42 → 78 arc
+├── prompts/                               human-readable copy of system prompts
+├── docs/                                  pitch script, judge Q&A, sample report
+├── vercel.json                            SPA rewrites + security headers
+├── .env.example                           every env var, with public/private notes
+└── README.md                              this file
 ```
 
-## Demo arc
+★ = sponsor-integration anchor file.
 
-The bundled demo replays the PRD §10 use case:
+## Completed features
 
-1. AutoReply AI (Gmail auto-reply assistant) → trial → score **42 / 100**.
-2. Five specialists raise risks (prompt injection, GDPR, irreversible auto-send, …).
-3. Pick fixes from the checklist → run retrial → score moves to **78 / 100**.
-4. Click **Export Markdown** for a shareable verdict report.
+- ✅ Six-agent debate with role-specific OpenAI structured outputs
+- ✅ Final judge with weighted scoring rubric (PRD §19)
+- ✅ Risk cards with severity, category, impact, fix
+- ✅ Fix selection + retrial loop (improved spec rewrite + agents re-run)
+- ✅ Before / after comparison
+- ✅ Markdown export (PRD §21 format)
+- ✅ Real-time multi-tab sync via Convex reactive queries
+- ✅ Cinematic Debate Arena with directional speech bubbles
+- ✅ Fullscreen mode + persistent fullscreen hint
+- ✅ Per-agent narration timing (text duration estimate or audio.ended)
+- ✅ Pause / Skip / Replay controls during the trial
+- ✅ Gemini Voice for the closing statement (ElevenLabs fallback)
+- ✅ Fal character-art generation for the six standees
+- ✅ Web Speech API voice input on the intake form
+- ✅ Friendly failure UX with one-click Switch-to-Demo
+- ✅ React error boundary
+- ✅ Server-side input validation + rate limits
+- ✅ Demo mode end-to-end without any keys
+- ✅ Vercel deploy with SPA rewrites + security headers
 
-## Scoring rubric (PRD §19)
+## What's next
 
-| Category | Weight |
-| --- | ---: |
-| Privacy and data handling | 20 |
-| Prompt injection and AI safety | 20 |
-| Abuse and misuse potential | 20 |
-| UX clarity and trust | 15 |
-| Business differentiation | 15 |
-| Launch / demo readiness | 10 |
+- **Authentication + ownership.** Add Convex Auth, attach `userId` to trials, gate every read/write on owner match.
+- **Judge persona library.** Industry-specific judges (FinTech regulator, healthcare ethics board, EU privacy authority).
+- **Per-agent voice.** Stream Gemini Voice for every specialist's testimony, not just the judge.
+- **Real codebase ingestion.** Optional repo URL → README + key prompts → richer trial input.
+- **Team mode.** Share a trial link, collaborative fix selection, threaded comments per risk card.
+- **Compliance report.** Add a dedicated "regulator-readable" export for finance / healthcare / EU.
 
-| Score | Label |
-| --- | --- |
-| 80–100 | Safe to demo |
-| 40–79 | Needs fixes before launch |
-| 0–39 | High risk |
+## Final pitch line
 
-## Build
-
-```bash
-npm run build
-```
-
-Passes TypeScript and Vite production build cleanly. Output in `dist/`.
-
-## Deploy to Vercel
-
-The repo ships a [`vercel.json`](./vercel.json) with the right SPA rewrites
-(every path → `/index.html`) and a sensible default header pack
-(`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-`X-Frame-Options: SAMEORIGIN`, `Permissions-Policy` denying camera/geolocation
-and limiting microphone access to `self`).
-
-1. **Connect the repo** in the Vercel dashboard. Framework auto-detects as
-   Vite. Build command `npm run build`, output `dist`.
-2. **Set environment variables** in Vercel → Settings → Environment Variables.
-   Only the public Convex URL is needed for the browser bundle:
-
-   | Vercel env var      | Value                                | Notes                                |
-   | ------------------- | ------------------------------------ | ------------------------------------ |
-   | `VITE_CONVEX_URL`   | `https://<your>.convex.cloud`        | **Public** — baked into the JS bundle |
-
-   Do **not** set `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`,
-   or `FAL_KEY` on Vercel. Those are server-only secrets and live in the
-   **Convex dashboard** → Settings → Environment Variables (see "Live mode"
-   section above). They're consumed by Convex actions, not the browser.
-
-3. **Optional browser-only voice keys** (demo deploys only):
-   `VITE_ELEVENLABS_API_KEY` is supported as a *demo fallback* when no Convex
-   deployment is configured. Note: any `VITE_*` variable is **embedded into
-   the static JS bundle and visible to anyone**. Don't set this on a public
-   deployment unless you accept that risk.
-
-4. **Push to main** → Vercel rebuilds automatically. The first deploy needs
-   `npx convex deploy` once locally to push the schema/functions to your
-   Convex production deployment, then update Vercel's `VITE_CONVEX_URL` to
-   point at the production URL.
-
-## Security & abuse-prevention
-
-This deployment is publicly reachable and has **no user authentication** —
-trial IDs are unguessable Convex document IDs (random 32-char strings) and
-function as bearer tokens. The following safeguards are in place:
-
-- **Server-side input validation** in `convex/trials.ts::createTrial` —
-  required-field checks and per-field length caps (`productName ≤ 120`,
-  `productDescription ≤ 3000`, …). Mirrors the client form so a custom
-  Convex client can't bypass it.
-- **Per-deployment rate limits** (sliding window, persisted in the
-  `rateLimits` table — see `convex/rateLimit.ts`):
-  - `createTrial` — 60 / hour
-  - `runTrial`, `runRetrial` — 30 / hour each
-  - `falActions.generateAll` — 6 / hour (each run = 6 Fal images)
-  - `voiceActions.synthesizeVerdictVoice` — 60 / hour, with a 2 000-char
-    text cap on the input
-- **Secret hygiene** — server-only keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`,
-  `ELEVENLABS_API_KEY`, `FAL_KEY`) are read by Convex actions via
-  `process.env.*` and never exposed to the browser. The `VITE_*` voice keys
-  are explicitly marked as demo-only with comments in `.env.example`.
-- **Frontend error containment** — `<ErrorBoundary>` wraps the trial
-  dashboard so a render-time crash falls back to a stack panel instead of a
-  blank screen. The `<LiveModeFailureBanner>` translates raw provider
-  errors into a friendly "tokens on a coffee break" UX with a one-click
-  switch to Demo Mode.
-- **No `dangerouslySetInnerHTML`, `eval`, or `Function` constructors**
-  anywhere in the codebase (verified via grep).
-- **Prompt injection** — all user input flows into structured-output OpenAI
-  calls with explicit role separation in `convex/prompts.ts` (system prompt
-  vs. product description). Model output is parsed with strict JSON
-  schemas before being persisted; an injected payload can at worst alter
-  the verdict text, never trigger privileged actions.
-
-### Known limitations / TODOs
-
-- **No authentication.** Anyone with a trial ID can read its data and
-  toggle `selectedForFix` flags via `risks.toggleRiskFix`. Acceptable for
-  the hackathon demo (IDs are unguessable random strings) but should be
-  replaced with proper auth (Convex Auth, Clerk, etc.) before any
-  production use. Mark as TODO.
-- **Trial ownership** — there's no `userId` field on trials yet, so we
-  can't enforce horizontal-isolation checks server-side. Add when auth
-  lands.
-- **Convex CORS** is managed by Convex itself; the function endpoints only
-  accept calls from clients carrying the deployment URL.
-
-## Hackathon non-goals
-
-Per PRD §31:
-
-- Not a code vulnerability scanner.
-- No real exploit generation.
-- No authentication, team collaboration, payment, or browser scraping for the MVP.
+**TrialRun is a trial run for ideas. Six AI agents. One verdict. Built for the moment between "I think this is ready" and "we shipped this in front of users."**

@@ -1,5 +1,22 @@
 "use node";
 
+/*
+ * ============================================================================
+ *   SPONSOR INTEGRATION — Gemini Voice (primary) + ElevenLabs (fallback)
+ * ============================================================================
+ *   Voice-verdict TTS, called from `<VoiceVerdictButton />`. Gemini's
+ *   gemini-2.5-flash-preview-tts is tried first; PCM bytes are wrapped in a
+ *   WAV header server-side so the browser <audio> can play them directly.
+ *   On Gemini failure or missing key, falls back to ElevenLabs
+ *   (eleven_multilingual_v2). Returns base64 audio so keys never reach the
+ *   browser.
+ *
+ *   Keys:   process.env.GEMINI_API_KEY      (primary)
+ *           process.env.ELEVENLABS_API_KEY  (fallback)
+ *           Both set in Convex dashboard env.
+ * ============================================================================
+ */
+
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";

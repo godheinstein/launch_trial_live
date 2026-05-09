@@ -1,5 +1,21 @@
 "use node";
 
+/*
+ * ============================================================================
+ *   SPONSOR INTEGRATION — Fal
+ * ============================================================================
+ *   Triggered by the "Generate agent visuals" button in the Debate Arena
+ *   toolbar. Hits fal-ai/flux/schnell once per agent (six images),
+ *   persists the URLs to the `agentAssets` Convex table, and `arenaMapper`
+ *   overlays them onto the Debate Arena standees. Bundled CDN defaults +
+ *   CSS silhouettes act as fallbacks if generation is skipped or fails.
+ *
+ *   Key:        process.env.FAL_KEY  (server-only; never sent to browser)
+ *   Rate limit: 6 full generations per hour, deployment-wide
+ *               (see `convex/rateLimit.ts`).
+ * ============================================================================
+ */
+
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 
