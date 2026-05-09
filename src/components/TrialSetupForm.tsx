@@ -56,8 +56,8 @@ export function TrialSetupForm() {
       productDescription:
         productDescription ||
         "We built an AI email assistant that connects to Gmail, reads important emails, and automatically replies on behalf of the user. It decides which emails are urgent, drafts replies, and can send them automatically.",
-      targetUsers: targetUsers || "AI builders",
-      aiActions: aiActions || "Reads input, generates output",
+      targetUsers: targetUsers || "Builders and product teams",
+      aiActions: aiActions || "User-driven actions; no AI automation",
       dataAccessed: dataAccessed || "User-provided text",
       autonomyLevel,
       additionalContext: additionalContext || undefined,
@@ -89,10 +89,11 @@ export function TrialSetupForm() {
           <Gavel className="h-3 w-3" /> Step 1 of 2
         </span>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          Describe the product on trial
+          Describe the product or idea on trial
         </h1>
         <p className="mt-2 text-slate-400">
-          Be specific about capabilities, autonomy, and data — sharper inputs
+          App, product, startup idea, workflow, feature — be specific about
+          what it does, who it's for, and what data it touches. Sharper inputs
           mean sharper critique.
         </p>
       </div>
@@ -127,12 +128,12 @@ export function TrialSetupForm() {
       <form onSubmit={handleSubmit} className="panel p-6 space-y-5">
         <div>
           <label className="label" htmlFor="productName">
-            Product name
+            Product or idea name
           </label>
           <input
             id="productName"
             className="input"
-            placeholder="e.g. AutoReply AI"
+            placeholder="e.g. AutoReply AI, Local Coffee Map, Inventory Tracker"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
           />
@@ -140,14 +141,14 @@ export function TrialSetupForm() {
 
         <div>
           <label className="label" htmlFor="productDescription">
-            Product description
+            What does it do?
           </label>
           <textarea
             id="productDescription"
             required
             rows={4}
             className="input resize-y"
-            placeholder="What does the product do, end to end?"
+            placeholder="Describe the product, app, idea, or workflow end to end."
             value={productDescription}
             onChange={(e) => setProductDescription(e.target.value)}
           />
@@ -182,15 +183,19 @@ export function TrialSetupForm() {
 
         <div>
           <label className="label" htmlFor="aiActions">
-            AI actions
+            What it does on the user's behalf
           </label>
           <input
             id="aiActions"
             className="input"
-            placeholder="Reads emails, drafts replies, sends, …"
+            placeholder="e.g. reads emails and drafts replies, charges a card, posts publicly, none"
             value={aiActions}
             onChange={(e) => setAiActions(e.target.value)}
           />
+          <p className="text-[11px] text-slate-500 mt-1">
+            If this isn't an AI product, describe the actions your product
+            takes for the user (or "none — user-driven").
+          </p>
         </div>
 
         <div>
@@ -222,13 +227,13 @@ export function TrialSetupForm() {
 
         <div>
           <label className="label" htmlFor="additionalContext">
-            Optional: prompt, landing copy, or README
+            Optional: landing copy, README, pricing, system prompt
           </label>
           <textarea
             id="additionalContext"
             rows={3}
             className="input resize-y"
-            placeholder="Paste your system prompt, pricing, integration scope, etc."
+            placeholder="Anything else worth knowing — pricing, integrations, scope, brand voice, system prompt, etc."
             value={additionalContext}
             onChange={(e) => setAdditionalContext(e.target.value)}
           />

@@ -1,8 +1,8 @@
 # Launch Trial Live
 
-Put your AI product on trial before users, attackers, regulators, and judges do.
+Put any product or idea on trial before users, attackers, customers, and judges do.
 
-A multi-agent red-teaming simulator for AI product launches. Five specialist agents (malicious user, privacy auditor, confused customer, prompt-injection attacker, skeptical investor) prosecute your product. A final judge issues a launch readiness score, top risks, and concrete fixes. Apply the fixes, rerun the trial, watch the score move.
+A multi-agent red-teaming simulator for product launches — apps, startup ideas, workflows, features, and AI products. Five specialist agents (malicious user, privacy auditor, confused customer, prompt-injection attacker, skeptical investor) prosecute your product or idea. A final judge issues a launch readiness score, top risks, and concrete fixes. Apply the fixes, rerun the trial, watch the score move.
 
 Built for the AIE Hackathon.
 
@@ -27,6 +27,17 @@ Open http://localhost:5173 → click **Run demo product** → watch the trial.
 
 The header chip shows `demo` when `VITE_CONVEX_URL` is unset, `live` when it is.
 
+## Voice verdict (optional polish)
+
+The judge's closing statement can be spoken via the **Play voice verdict** button on the verdict card. Voice is opt-in and never blocks the trial flow. Provider chain (first match wins):
+
+1. **Gemini Voice** — *TODO*. Provider interface is in place; actual call is stubbed because Gemini's TTS API isn't yet a simple browser-side REST endpoint. Wire it server-side via Convex once available.
+2. **ElevenLabs** — fully working. Set either:
+   - `VITE_ELEVENLABS_API_KEY` in `.env.local` to call from the browser (simplest for local demo), or
+   - `ELEVENLABS_API_KEY` in the Convex dashboard to keep the key server-side (recommended for shared deploys).
+
+If neither provider is configured, the button shows a quiet "configure key" hint instead of an error. Demo mode never requires voice.
+
 ## Live mode (Convex + OpenAI)
 
 > **Note:** the Convex CLI requires Node 20+. Demo mode works on Node 18.
@@ -39,16 +50,28 @@ The header chip shows `demo` when `VITE_CONVEX_URL` is unset, `live` when it is.
    ```
    `.env.local` should contain:
    ```env
+   # Convex
    VITE_CONVEX_URL=
+   CONVEX_DEPLOYMENT=
+
+   # Convex runtime env (set in dashboard, not in .env.local)
    OPENAI_API_KEY=
    ELEVENLABS_API_KEY=
+   GEMINI_API_KEY=
    FAL_KEY=
+
+   # Browser-side voice fallbacks (optional, demo-only)
+   VITE_ELEVENLABS_API_KEY=
+   VITE_GEMINI_API_KEY=
    ```
 3. Initialize Convex (this generates `convex/_generated/` and populates `VITE_CONVEX_URL`):
    ```bash
    npx convex dev
    ```
-4. Inside the Convex dashboard, set the `OPENAI_API_KEY` environment variable (Settings → Environment Variables). Convex actions read it at runtime.
+4. Inside the Convex dashboard, set the runtime environment variables (Settings → Environment Variables):
+   - `OPENAI_API_KEY` — required for the agent calls.
+   - `ELEVENLABS_API_KEY` — optional; enables the voice verdict server-side.
+   - `GEMINI_API_KEY` — optional; reserved for the Gemini voice provider (TODO).
 5. Wire the client to live data: replace the `useTrialEngine` import in `src/components/TrialDashboard.tsx` with the live hook described in `src/lib/useLiveTrial.ts`.
 6. Run the app:
    ```bash
@@ -69,6 +92,7 @@ launch-trial-live/
 │   ├── reports.ts                 # generateReport (markdown), getLatestReport
 │   ├── prompts.ts                 # SHARED_SYSTEM, agent prompts, JSON schemas (§17)
 │   ├── openai.ts                  # GPT-5.5 structured-output client (Node runtime)
+│   ├── voiceActions.ts            # ElevenLabs synthesis (Gemini TODO) — Node runtime
 │   └── runner.ts                  # runTrial / runRetrial actions (Node runtime)
 └── src/
     ├── App.tsx                    # router /, /new, /trial/:trialId
@@ -80,7 +104,8 @@ launch-trial-live/
     │   ├── cn.ts                  # clsx + tailwind-merge
     │   ├── convexClient.ts        # ConvexReactClient (auto-detect)
     │   ├── useTrialEngine.ts      # demo-mode driver
-    │   └── useLiveTrial.ts        # live-mode wiring stub (post-codegen)
+    │   ├── useLiveTrial.ts        # live-mode wiring stub (post-codegen)
+    │   └── voice.ts               # voice provider chain (Gemini stub → ElevenLabs)
     ├── demo/
     │   ├── sampleInputs.ts        # AutoReply AI, Meeting Agent, AI Recruiter
     │   ├── sampleTrialResult.json # full 42 → 78 demo arc
@@ -99,7 +124,8 @@ launch-trial-live/
         ├── VerdictPanel.tsx
         ├── FixSelectionPanel.tsx
         ├── BeforeAfterComparison.tsx
-        └── MarkdownExportButton.tsx
+        ├── MarkdownExportButton.tsx
+        └── VoiceVerdictButton.tsx
 ```
 
 ## Demo arc

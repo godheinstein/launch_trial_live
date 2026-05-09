@@ -2,9 +2,9 @@
 
 ## 30 seconds
 
-Launch Trial Live is a real-time AI product red-team simulator for builders.
+Launch Trial Live is a real-time multi-agent red-team simulator for any product or idea — apps, startup ideas, workflows, features, AI agents.
 
-Instead of asking a chatbot, "what could go wrong?", you enter a product idea and watch specialist agents challenge it from different angles: malicious use, privacy, customer confusion, prompt injection, market risk, and final launch judgment.
+Instead of asking a chatbot, "what could go wrong?", you enter a product or idea and watch specialist agents challenge it from different angles: malicious use, privacy, customer confusion, prompt injection (when it applies), market risk, and final launch judgment.
 
 In our demo, an AI email assistant starts at a launch-readiness score of 42 because automatic Gmail replies create privacy and injection risk. After applying guardrails, the retrial score rises to 78.
 
@@ -12,7 +12,7 @@ The value is simple: find the launch blockers before users, reviewers, or attack
 
 ## 60 seconds
 
-Builders ship AI products fast, but product-level risk is hard to see from inside the team. Code scanners do not tell you whether your product can be abused, whether users understand the autonomy, or whether hostile content can manipulate an agent.
+Builders ship products and ideas fast, but product-level risk is hard to see from inside the team. Code scanners do not tell you whether your product can be abused, whether users understand what the product actually does, whether sensitive data is handled correctly, or whether hostile content can manipulate any AI surface in the loop.
 
 Launch Trial Live turns that review into a live trial. You paste a product description, then multiple AI agents interrogate it: malicious user, privacy auditor, confused customer, prompt-injection attacker, skeptical investor, and final judge. Each agent produces concrete risks and fixes, not generic advice.
 
@@ -24,9 +24,9 @@ That before-and-after loop is the product: identify risks, apply fixes, rerun th
 
 ## 2 minutes
 
-Launch Trial Live helps builders test AI products before launch at the product level, not just the code level.
+Launch Trial Live helps builders test any product or idea before launch at the product level, not just the code level.
 
-The problem is that modern AI products fail in ways normal QA misses. An agent might take an unsafe action. A user might not understand when automation is happening. A malicious email, document, or webpage might inject instructions. A privacy reviewer might reject a product because the data boundary is vague. These are launch-readiness risks.
+The problem is that modern products fail in ways normal QA misses. An automation might take an unsafe action. A user might not understand what the product is actually doing. A malicious email, document, or webpage might inject instructions into an AI surface. A privacy reviewer might reject a product because the data boundary is vague. These are launch-readiness risks that show up the same whether or not the product is AI-driven.
 
 Our workflow is built around a live multi-agent trial. The user enters a product idea, landing page, prompt, README, or feature spec. Then six agents evaluate it:
 

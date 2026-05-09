@@ -2,7 +2,7 @@
 
 ## What is Launch Trial Live?
 
-A real-time AI product red-team simulator. It evaluates product-level launch risk using specialist agents, then produces a score, verdict, risk cards, fixes, retrial, and exportable report.
+A real-time multi-agent red-team simulator for any product or idea on its way to launch — apps, startup ideas, workflows, features, AI agents. It evaluates product-level launch risk using specialist agents, then produces a score, verdict, risk cards, fixes, retrial, and exportable report.
 
 ## How is this different from asking ChatGPT for feedback?
 

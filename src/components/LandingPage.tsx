@@ -29,13 +29,13 @@ const VALUE_CARDS = [
   {
     icon: ShieldCheck,
     title: "Catch abuse cases",
-    body: "Specialist red-team agents probe the workflows real attackers will hit on day one.",
+    body: "Specialist agents probe how real users and attackers will misuse your product, app, or workflow on day one.",
     accent: "#ff4d6d",
   },
   {
     icon: Lock,
     title: "Find privacy risks",
-    body: "Trace data end-to-end, surface non-consenting processing, and flag scope creep.",
+    body: "Trace data end-to-end, surface non-consenting processing, and flag scope creep across any product or idea.",
     accent: "#7c5cff",
   },
   {
@@ -65,16 +65,17 @@ export function LandingPage() {
           <Gavel className="h-3 w-3" /> AIE Hackathon
         </span>
         <h1 className="text-balance text-5xl md:text-6xl font-bold tracking-tight">
-          Put your AI product on trial
+          Put any product or idea on trial
           <br />
           <span className="bg-gradient-to-r from-accent-soft via-accent to-risk-high bg-clip-text text-transparent">
-            before users do.
+            before users, attackers, customers, and judges do.
           </span>
         </h1>
         <p className="mt-6 text-lg text-slate-300 max-w-2xl mx-auto">
-          Five specialist agents prosecute your product. A final judge issues a
-          launch readiness score, top risks, and concrete fixes. Apply the
-          fixes, rerun the trial, watch the score move.
+          Whether it's an app, a startup idea, a workflow, or a feature, five
+          specialist agents prosecute it for privacy, abuse, UX, trust, and
+          business risk. A final judge issues a launch readiness score and a
+          fix list. Apply the fixes, rerun the trial, watch the score move.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link to="/new" className="btn-primary px-5 py-2.5 text-base">
@@ -82,7 +83,7 @@ export function LandingPage() {
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link to="/new?demo=1" className="btn-secondary px-5 py-2.5 text-base">
-            Run demo product
+            Run demo
           </Link>
         </div>
 

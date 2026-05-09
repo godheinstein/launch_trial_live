@@ -32,11 +32,11 @@ export function buildMarkdown(result: TrialResult): string {
   const t = result.trial;
   lines.push(`# Launch Trial Report: ${t.productName}`);
   lines.push("");
-  lines.push("## Product Summary");
+  lines.push("## Product or Idea Summary");
   lines.push(t.productDescription);
   lines.push("");
   lines.push(`- **Target users:** ${t.targetUsers}`);
-  lines.push(`- **AI actions:** ${t.aiActions}`);
+  lines.push(`- **What it does on the user's behalf:** ${t.aiActions}`);
   lines.push(`- **Data accessed:** ${t.dataAccessed}`);
   lines.push(`- **Autonomy:** ${t.autonomyLevel}`);
   if (t.additionalContext)
@@ -44,7 +44,7 @@ export function buildMarkdown(result: TrialResult): string {
   lines.push("");
 
   if (result.initialVerdict) {
-    lines.push("## Initial Verdict");
+    lines.push("## Launch Readiness Verdict");
     lines.push(`**Score:** ${result.initialVerdict.launchReadinessScore} / 100`);
     lines.push(
       `**Label:** ${verdictLabelText(result.initialVerdict.verdictLabel)}`,

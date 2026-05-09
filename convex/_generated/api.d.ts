@@ -16,6 +16,7 @@ import type * as risks from "../risks.js";
 import type * as runner from "../runner.js";
 import type * as trials from "../trials.js";
 import type * as verdicts from "../verdicts.js";
+import type * as voiceActions from "../voiceActions.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   runner: typeof runner;
   trials: typeof trials;
   verdicts: typeof verdicts;
+  voiceActions: typeof voiceActions;
 }>;
 
 /**

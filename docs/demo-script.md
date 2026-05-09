@@ -13,7 +13,7 @@ Show the full loop: risky product input, live multi-agent trial, harsh verdict, 
 ## Flow
 
 1. Open the app.
-   - Narration: "Launch Trial Live tests AI products before launch with specialist red-team agents."
+   - Narration: "Launch Trial Live puts any product or idea on trial before launch — apps, startup ideas, workflows, AI agents — with specialist red-team agents."
 
 2. Select or paste the AI email assistant sample.
    - Input: "An AI email assistant that connects to Gmail, reads important emails, drafts replies, and can automatically send responses on behalf of the user."

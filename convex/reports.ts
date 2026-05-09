@@ -41,11 +41,11 @@ export const generateReport = mutation({
     const lines: string[] = [];
     lines.push(`# Launch Trial Report: ${trial.productName}`);
     lines.push("");
-    lines.push("## Product Summary");
+    lines.push("## Product or Idea Summary");
     lines.push(trial.productDescription);
     lines.push("");
     lines.push(`- Target users: ${trial.targetUsers}`);
-    lines.push(`- AI actions: ${trial.aiActions}`);
+    lines.push(`- What it does on the user's behalf: ${trial.aiActions}`);
     lines.push(`- Data accessed: ${trial.dataAccessed}`);
     lines.push(`- Autonomy: ${trial.autonomyLevel}`);
     if (trial.additionalContext)
@@ -53,7 +53,7 @@ export const generateReport = mutation({
     lines.push("");
 
     if (initialVerdict) {
-      lines.push("## Initial Verdict");
+      lines.push("## Launch Readiness Verdict");
       lines.push(`Score: ${initialVerdict.launchReadinessScore}`);
       lines.push(`Label: ${initialVerdict.verdictLabel}`);
       lines.push(`Summary: ${initialVerdict.summary}`);

@@ -3,6 +3,7 @@ import { Gavel, Quote, Sparkles } from "lucide-react";
 import type { Verdict } from "../types";
 import { verdictLabelText, verdictTone } from "../lib/scoring";
 import { cn } from "../lib/cn";
+import { VoiceVerdictButton } from "./VoiceVerdictButton";
 
 interface Props {
   verdict: Verdict;
@@ -91,6 +92,9 @@ export function VerdictPanel({ verdict }: Props) {
           <p className="text-sm text-slate-200 italic leading-relaxed">
             {verdict.judgeClosingStatement}
           </p>
+        </div>
+        <div className="mt-3 flex items-center justify-end">
+          <VoiceVerdictButton text={verdict.judgeClosingStatement} />
         </div>
       </div>
     </motion.section>
