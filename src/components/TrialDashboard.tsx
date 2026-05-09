@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -6,7 +6,16 @@ import {
   RefreshCw,
   Activity,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useFullscreen } from "../lib/useFullscreen";
+import { useNarrationController } from "../lib/useNarrationController";
+import { getBubbleText } from "../lib/bubbleText";
+import { FullscreenButton } from "./FullscreenButton";
+import { FullscreenPrompt } from "./FullscreenPrompt";
+import { FullscreenHint } from "./FullscreenHint";
+import { NarrationControls } from "./NarrationControls";
 import { useTrialEngine } from "../lib/useTrialEngine";
 import { useLiveTrial } from "../lib/useLiveTrial";
 import { isLiveMode } from "../lib/convexClient";
@@ -91,7 +100,23 @@ export function TrialDashboard() {
     [searchParams],
   );
 
-  const demo = useTrialEngine(trialId ?? "trial", productFromParams);
+  // Narration controller — gates demo runner progression and animates a
+  // per-agent progress bar so each agent stays on stage long enough to read.
+  const narrator = useNarrationController();
+
+  const demo = useTrialEngine(trialId ?? "trial", productFromParams, {
+    waitAfterAgent: (message) => {
+      const text =
+        getBubbleText(message, message.agentType, undefined) ??
+        message.headline ??
+        "";
+      return narrator.narrate(message.agentType, text);
+    },
+    waitAfterJudge: (verdict) => {
+      const text = verdict.judgeClosingStatement ?? verdict.summary ?? "";
+      return narrator.narrate("final_judge", text);
+    },
+  });
 
   // ----- Adapter: pick the source of truth based on mode -----
   const product: ProductInput = useLive && live.trial
@@ -152,6 +177,42 @@ export function TrialDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ----- Live-mode best-effort narration -----
+  // We can't pause the Convex stream, but when a new message lands we kick
+  // off narration so the active agent gets the spotlight & progress bar.
+  const lastNarratedMessageId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!useLive) return;
+    const messages = showRetrial ? retrialAgents : initialAgents;
+    const lastDone = [...messages]
+      .reverse()
+      .find((a) => a.status === "complete" && a.message);
+    const message = lastDone?.message;
+    if (!message) return;
+    if (lastNarratedMessageId.current === message.id) return;
+    lastNarratedMessageId.current = message.id;
+    const text =
+      getBubbleText(message, message.agentType, undefined) ??
+      message.headline ??
+      "";
+    void narrator.narrate(message.agentType, text);
+  }, [useLive, showRetrial, initialAgents, retrialAgents, narrator]);
+
+  // Live-mode: narrate the closing statement once the verdict resolves.
+  const lastNarratedVerdict = useRef<string | null>(null);
+  useEffect(() => {
+    if (!useLive) return;
+    const v = showRetrial ? retrialVerdict : initialVerdict;
+    if (!v) return;
+    const key = `${v.phase}-${v.launchReadinessScore}`;
+    if (lastNarratedVerdict.current === key) return;
+    lastNarratedVerdict.current = key;
+    void narrator.narrate(
+      "final_judge",
+      v.judgeClosingStatement ?? v.summary ?? "",
+    );
+  }, [useLive, showRetrial, initialVerdict, retrialVerdict, narrator]);
 
   const liveScore = useMemo(() => {
     if (status === "draft") return undefined;
@@ -236,6 +297,29 @@ export function TrialDashboard() {
     ? live.result ?? demo.result
     : demo.result;
 
+  // ----- Fullscreen hooks. Must run on every render (rules of hooks),
+  // so they live ABOVE any early returns. -----
+  const fullscreen = useFullscreen<HTMLElement>();
+  const [fsPromptOpen, setFsPromptOpen] = useState(false);
+
+  useEffect(() => {
+    if (!fullscreen.supported) return;
+    const dismissed = window.localStorage.getItem("ltl_skip_fs_prompt");
+    if (dismissed === "1") return;
+    const timer = window.setTimeout(() => setFsPromptOpen(true), 700);
+    return () => window.clearTimeout(timer);
+  }, [fullscreen.supported]);
+
+  const onAcceptFullscreen = async () => {
+    setFsPromptOpen(false);
+    window.localStorage.setItem("ltl_skip_fs_prompt", "1");
+    await fullscreen.enter();
+  };
+  const onSkipFullscreen = () => {
+    setFsPromptOpen(false);
+    window.localStorage.setItem("ltl_skip_fs_prompt", "1");
+  };
+
   if (useLive && !live.isReady) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-24 text-center">
@@ -265,131 +349,125 @@ export function TrialDashboard() {
     );
   }
 
+  const runButtonNode = (
+    <button
+      type="button"
+      onClick={runInitial}
+      disabled={isRunning}
+      className={cn(status === "draft" ? "btn-primary" : "btn-secondary")}
+    >
+      {isRunning ? (
+        <>
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          Running…
+        </>
+      ) : status === "draft" ? (
+        <>
+          <Play className="h-3.5 w-3.5" />
+          {useLive ? "Start trial" : "Run demo mode"}
+        </>
+      ) : (
+        <>
+          <RefreshCw className="h-3.5 w-3.5" />
+          Re-run trial
+        </>
+      )}
+    </button>
+  );
+
+  const fullscreenButtonNode = (
+    <FullscreenButton
+      isFullscreen={fullscreen.isFullscreen}
+      onToggle={fullscreen.toggle}
+      supported={fullscreen.supported}
+    />
+  );
+
+  const fullscreenHintNode = (
+    <FullscreenHint
+      visible={fullscreen.supported && !fullscreen.isFullscreen}
+      onEnter={() => void fullscreen.enter()}
+    />
+  );
+
+  const narrationControlNode = (
+    <NarrationControls
+      active={narrator.state.active}
+      paused={narrator.state.paused}
+      onPause={narrator.pause}
+      onResume={narrator.resume}
+      onSkip={narrator.skip}
+      onReplay={narrator.replay}
+    />
+  );
+
+  const liveAlert =
+    useLive && live.actionError ? (
+      <div className="rounded-xl border border-risk-critical/40 bg-risk-critical/5 px-4 py-3 text-sm text-risk-critical flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+        <span>{live.actionError}</span>
+      </div>
+    ) : null;
+
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8">
-      <div className="flex items-center justify-between gap-3 mb-6">
+    <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <Link to="/new" className="btn-ghost text-xs">
           <ArrowLeft className="h-3.5 w-3.5" />
           New trial
         </Link>
         <div className="flex items-center gap-2">
           {result?.initialVerdict && <MarkdownExportButton result={result} />}
-          <button
-            type="button"
-            onClick={runInitial}
-            disabled={isRunning}
-            className="btn-secondary"
-          >
-            {isRunning ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Running…
-              </>
-            ) : status === "draft" ? (
-              <>
-                <Play className="h-3.5 w-3.5" />
-                {useLive ? "Start trial" : "Run demo mode"}
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-3.5 w-3.5" />
-                Re-run trial
-              </>
-            )}
-          </button>
         </div>
       </div>
 
-      {useLive && live.actionError && (
-        <div className="mb-4 rounded-xl border border-risk-critical/40 bg-risk-critical/5 px-4 py-3 text-sm text-risk-critical flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{live.actionError}</span>
-        </div>
-      )}
+      <FullscreenPrompt
+        open={fsPromptOpen}
+        onEnter={() => void onAcceptFullscreen()}
+        onSkip={onSkipFullscreen}
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <section className="panel p-5">
-            <span className="chip mb-2 text-[10px]">trial · {trialId}</span>
-            <h1 className="text-xl font-semibold tracking-tight">
-              {product.productName}
-            </h1>
-            <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-              {product.productDescription}
-            </p>
+      {/* ===== Full-width chamber hero ===== */}
+      <TrialChamber
+        ref={fullscreen.ref}
+        productName={product.productName}
+        productDescription={product.productDescription}
+        agents={showRetrial ? retrialAgents : initialAgents}
+        risks={showRetrial ? retrialRisks : initialRisks}
+        status={status}
+        verdict={showRetrial ? retrialVerdict : initialVerdict}
+        phase={showRetrial ? "retrial" : "initial"}
+        runControl={runButtonNode}
+        alert={liveAlert}
+        fullscreenControl={fullscreenButtonNode}
+        isFullscreen={fullscreen.isFullscreen}
+        hint={fullscreenHintNode}
+        narrationControl={narrationControlNode}
+        narratingAgent={narrator.state.agentType}
+        narrationProgress={narrator.state.progress}
+        narrationPaused={narrator.state.paused}
+      />
 
-            <dl className="mt-4 space-y-2 text-xs">
-              <Row label="Target users" value={product.targetUsers} />
-              <Row
-                label="What it does on the user's behalf"
-                value={product.aiActions}
-              />
-              <Row label="Data accessed" value={product.dataAccessed} />
-              <Row
-                label="Autonomy"
-                value={autonomyLabel(product.autonomyLevel)}
-              />
-              {product.additionalContext && (
-                <Row label="Context" value={product.additionalContext} />
-              )}
-            </dl>
-          </section>
+      {/* ===== Detailed dashboard below ===== */}
+      <div className="space-y-8 mt-8">
+        <ProductSummarySection
+          trialId={trialId}
+          product={product}
+          autonomy={autonomyLabel(product.autonomyLevel)}
+          status={status}
+          statusLabel={trialStatusLabel}
+          isRunning={isRunning}
+          liveScore={liveScore}
+          initialRisks={initialRisks}
+          retrialRisks={showRetrial ? retrialRisks : undefined}
+        />
 
-          <section className="panel p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                Trial status
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs">
-                <Activity
-                  className={cn(
-                    "h-3 w-3",
-                    isRunning
-                      ? "text-accent animate-pulse"
-                      : status === "completed" ||
-                          status === "retrial_completed"
-                        ? "text-risk-low"
-                        : "text-slate-500",
-                  )}
-                />
-                {trialStatusLabel}
-              </span>
-            </div>
-            {liveScore !== undefined && (
-              <div className="mt-3">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                  Live score
-                </div>
-                <div className="text-3xl font-bold tabular-nums">
-                  {liveScore}
-                </div>
-              </div>
-            )}
-          </section>
-
-          {(initialRisks.length > 0 || showRetrial) && (
-            <RiskRadarChart
-              initialRisks={initialRisks}
-              retrialRisks={showRetrial ? retrialRisks : undefined}
-            />
-          )}
-        </aside>
-
-        <div className="space-y-8 min-w-0">
-          <TrialChamber
-            agents={showRetrial ? retrialAgents : initialAgents}
-            risks={showRetrial ? retrialRisks : initialRisks}
-            status={status}
-            verdict={showRetrial ? retrialVerdict : initialVerdict}
-            phase={showRetrial ? "retrial" : "initial"}
-          />
-
-          <section>
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400 mb-3">
-              {showRetrial ? "Retrial · jury timeline" : "Jury timeline"}
-            </h2>
-            <AgentTimeline agents={showRetrial ? retrialAgents : initialAgents} />
-          </section>
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400 mb-3">
+            {showRetrial ? "Retrial · jury timeline" : "Jury timeline"}
+          </h2>
+          <AgentTimeline agents={showRetrial ? retrialAgents : initialAgents} />
+        </section>
 
           {initialVerdict && !showRetrial && (
             <section>
@@ -444,35 +522,34 @@ export function TrialDashboard() {
             </section>
           )}
 
-          {status === "draft" && !isDemoParam && (
-            <div className="panel p-8 text-center">
-              <p className="text-slate-300">
-                {useLive ? (
-                  <>
-                    Click{" "}
-                    <span className="text-white font-medium">Start trial</span>{" "}
-                    to run the agents on this product or idea.
-                  </>
-                ) : (
-                  <>
-                    Click{" "}
-                    <span className="text-white font-medium">
-                      Run demo mode
-                    </span>{" "}
-                    to replay a sample trial — the email-assistant arc takes
-                    about a minute.
-                  </>
-                )}
-              </p>
-              {!useLive && (
-                <p className="mt-2 text-xs text-slate-500">
-                  Live mode is active when VITE_CONVEX_URL is set and trials
-                  are created via the form.
-                </p>
+        {status === "draft" && !isDemoParam && (
+          <div className="panel p-8 text-center">
+            <p className="text-slate-300">
+              {useLive ? (
+                <>
+                  Click{" "}
+                  <span className="text-white font-medium">Start trial</span>{" "}
+                  to run the agents on this product or idea.
+                </>
+              ) : (
+                <>
+                  Click{" "}
+                  <span className="text-white font-medium">
+                    Run demo mode
+                  </span>{" "}
+                  to replay a sample trial — the email-assistant arc takes
+                  about a minute.
+                </>
               )}
-            </div>
-          )}
-        </div>
+            </p>
+            {!useLive && (
+              <p className="mt-2 text-xs text-slate-500">
+                Live mode is active when VITE_CONVEX_URL is set and trials are
+                created via the form.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -486,5 +563,127 @@ function Row({ label, value }: { label: string; value: string }) {
       </dt>
       <dd className="text-slate-200 leading-relaxed">{value}</dd>
     </div>
+  );
+}
+
+interface ProductSummarySectionProps {
+  trialId: string | undefined;
+  product: ProductInput;
+  autonomy: string;
+  status: TrialStatus;
+  statusLabel: string;
+  isRunning: boolean;
+  liveScore?: number;
+  initialRisks: RiskCardType[];
+  retrialRisks?: RiskCardType[];
+}
+
+function ProductSummarySection({
+  trialId,
+  product,
+  autonomy,
+  status,
+  statusLabel,
+  isRunning,
+  liveScore,
+  initialRisks,
+  retrialRisks,
+}: ProductSummarySectionProps) {
+  const [open, setOpen] = useState(true);
+  return (
+    <section className="panel">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left"
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="chip text-[10px]">trial · {trialId}</span>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Product / Idea Summary
+          </h2>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-300">
+            <Activity
+              className={cn(
+                "h-3 w-3",
+                isRunning
+                  ? "text-accent animate-pulse"
+                  : status === "completed" || status === "retrial_completed"
+                    ? "text-risk-low"
+                    : "text-slate-500",
+              )}
+            />
+            {statusLabel}
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 text-slate-400 transition-transform duration-200",
+              open ? "rotate-180" : "rotate-0",
+            )}
+          />
+        </div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="summary-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr_auto] gap-6 px-5 pb-5">
+              <div className="min-w-0">
+                <h3 className="text-xl font-semibold tracking-tight">
+                  {product.productName}
+                </h3>
+                <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                  {product.productDescription}
+                </p>
+                <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <Row label="Target users" value={product.targetUsers} />
+                  <Row
+                    label="What it does on the user's behalf"
+                    value={product.aiActions}
+                  />
+                  <Row label="Data accessed" value={product.dataAccessed} />
+                  <Row label="Autonomy" value={autonomy} />
+                  {product.additionalContext && (
+                    <Row label="Context" value={product.additionalContext} />
+                  )}
+                </dl>
+              </div>
+
+              <div className="rounded-xl border border-border bg-bg-elevated/40 p-4 self-start">
+                <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                  Live score
+                </div>
+                {liveScore !== undefined ? (
+                  <div className="mt-1 text-4xl font-bold tabular-nums">
+                    {liveScore}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-xl text-slate-500">—</div>
+                )}
+                <div className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+                  out of 100
+                </div>
+              </div>
+
+              {(initialRisks.length > 0 || (retrialRisks && retrialRisks.length > 0)) && (
+                <RiskRadarChart
+                  initialRisks={initialRisks}
+                  retrialRisks={retrialRisks}
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }

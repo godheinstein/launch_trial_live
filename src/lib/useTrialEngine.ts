@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type {
+  AgentMessage,
   AgentRunState,
   AgentType,
   ProductInput,
@@ -54,7 +55,21 @@ function applyAgentComplete(
   );
 }
 
-export function useTrialEngine(trialId: string, product: ProductInput) {
+export interface TrialEngineOptions {
+  /** Async hook called after each specialist message lands. Used to gate
+   *  progression on speech / narration duration. */
+  waitAfterAgent?: (message: AgentMessage) => Promise<void>;
+  /** Async hook called after the judge verdict lands. */
+  waitAfterJudge?: (verdict: Verdict) => Promise<void>;
+}
+
+export function useTrialEngine(
+  trialId: string,
+  product: ProductInput,
+  options?: TrialEngineOptions,
+) {
+  const optsRef = useRef(options);
+  optsRef.current = options;
   const [state, setState] = useState<EngineState>({
     status: "draft",
     phase: "initial",
@@ -158,7 +173,11 @@ export function useTrialEngine(trialId: string, product: ProductInput) {
               }));
             }
           },
-          { phase },
+          {
+            phase,
+            waitAfterAgent: (m) => optsRef.current?.waitAfterAgent?.(m) ?? Promise.resolve(),
+            waitAfterJudge: (v) => optsRef.current?.waitAfterJudge?.(v) ?? Promise.resolve(),
+          },
         );
       } finally {
         runningRef.current = false;

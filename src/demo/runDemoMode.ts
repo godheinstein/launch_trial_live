@@ -24,10 +24,24 @@ export type DemoEvent =
   | { type: "trial-complete"; phase: "initial" | "retrial" };
 
 export interface DemoOptions {
-  perAgentDelayMs?: number;
+  /** Time the "running" state shows before the message arrives. */
+  preMessageDelayMs?: number;
+  /** Beat between the last specialist and the judge. */
   judgeDelayMs?: number;
+  /** Beat before the trial-started event. */
   startupDelayMs?: number;
   phase?: "initial" | "retrial";
+  /**
+   * Called after each specialist message lands. The runner waits for the
+   * returned promise before progressing to the next agent. Use this to
+   * gate progression on speech narration / TTS playback duration.
+   */
+  waitAfterAgent?: (message: AgentMessage) => Promise<void>;
+  /**
+   * Called after the judge verdict lands. Same gating semantics as
+   * `waitAfterAgent` but for the closing statement.
+   */
+  waitAfterJudge?: (verdict: Verdict) => Promise<void>;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,7 +52,7 @@ export async function runDemoMode(
 ): Promise<TrialResult> {
   const phase = options.phase ?? "initial";
   const startupDelay = options.startupDelayMs ?? 350;
-  const perAgent = options.perAgentDelayMs ?? 950;
+  const preMessage = options.preMessageDelayMs ?? 600;
   const judgeDelay = options.judgeDelayMs ?? 900;
 
   const messages =
@@ -59,7 +73,7 @@ export async function runDemoMode(
 
   for (const agentType of SPECIALIST_AGENT_TYPES) {
     onEvent({ type: "agent-running", phase, agentType });
-    await sleep(perAgent);
+    await sleep(preMessage);
     const message = messages.find((m) => m.agentType === agentType);
     if (!message) continue;
     const matchedRisks = risks.filter((r) => r.agentType === agentType);
@@ -69,12 +83,20 @@ export async function runDemoMode(
       message,
       risks: matchedRisks,
     });
+
+    // Hold this agent on stage until narration finishes (or the user skips).
+    if (options.waitAfterAgent) {
+      await options.waitAfterAgent(message);
+    }
   }
 
   onEvent({ type: "judge-running", phase });
   await sleep(judgeDelay);
   if (verdict) {
     onEvent({ type: "verdict", phase, verdict });
+    if (options.waitAfterJudge) {
+      await options.waitAfterJudge(verdict);
+    }
   }
   onEvent({ type: "trial-complete", phase });
 

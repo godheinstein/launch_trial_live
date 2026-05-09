@@ -3,6 +3,8 @@ import { AppShell } from "./components/AppShell";
 import { LandingPage } from "./components/LandingPage";
 import { TrialSetupForm } from "./components/TrialSetupForm";
 import { TrialDashboard } from "./components/TrialDashboard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { DebateArena as DebateArenaPreview } from "./components/debate-arena";
 
 export default function App() {
   return (
@@ -11,7 +13,22 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<LandingPage />} />
           <Route path="/new" element={<TrialSetupForm />} />
-          <Route path="/trial/:trialId" element={<TrialDashboard />} />
+          <Route
+            path="/trial/:trialId"
+            element={
+              <ErrorBoundary fallbackTitle="The Trial Chamber crashed">
+                <TrialDashboard />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="/arena-preview"
+            element={
+              <ErrorBoundary fallbackTitle="The Arena preview crashed">
+                <DebateArenaPreview />
+              </ErrorBoundary>
+            }
+          />
           <Route
             path="*"
             element={
