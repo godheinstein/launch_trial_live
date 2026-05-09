@@ -1,11 +1,10 @@
 /*
  * Voice provider abstraction.
  *
- * Tries Gemini voice first, then falls back to ElevenLabs. Each provider is
- * a small async function that returns a playable audio Blob URL or throws.
- *
- * The button (VoiceVerdictButton) walks the chain in order and reports the
- * first provider that succeeded. The trial flow never blocks on voice.
+ * In live mode the button calls the Convex action `voiceActions.synthesizeVerdictVoice`
+ * which keeps API keys server-side. In demo-only mode (no Convex) the button
+ * falls back to the browser-side providers below — Gemini (TODO) then ElevenLabs.
+ * The trial flow never blocks on voice.
  */
 
 export type VoiceProviderId = "gemini" | "elevenlabs";
@@ -14,6 +13,7 @@ export interface VoiceProviderResult {
   provider: VoiceProviderId;
   audioUrl: string;
   cleanup: () => void;
+  source: "convex" | "browser";
 }
 
 export interface VoiceProvider {
@@ -96,6 +96,7 @@ const elevenLabsProvider: VoiceProvider = {
       provider: "elevenlabs",
       audioUrl: url,
       cleanup: () => URL.revokeObjectURL(url),
+      source: "browser",
     };
   },
 };
@@ -141,4 +142,35 @@ export async function synthesizeWithFallback(
     }
   }
   return { attempts };
+}
+
+function base64ToObjectUrl(base64: string, mimeType: string): string {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
+
+export interface ConvexVoiceResponse {
+  provider: VoiceProviderId;
+  mimeType: string;
+  audioBase64: string;
+}
+
+/**
+ * Wrap a Convex action result into a VoiceProviderResult so the button can
+ * play it the same way as a browser-side provider response.
+ */
+export function convexVoiceResultToProviderResult(
+  payload: ConvexVoiceResponse,
+): VoiceProviderResult {
+  const url = base64ToObjectUrl(payload.audioBase64, payload.mimeType);
+  return {
+    provider: payload.provider,
+    audioUrl: url,
+    cleanup: () => URL.revokeObjectURL(url),
+    source: "convex",
+  };
 }

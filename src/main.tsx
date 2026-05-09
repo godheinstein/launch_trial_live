@@ -5,12 +5,10 @@ import "./index.css";
 import App from "./App.tsx";
 import { convexClient } from "./lib/convexClient";
 
-const tree = convexClient ? (
-  <ConvexProvider client={convexClient}>
-    <App />
-  </ConvexProvider>
-) : (
-  <App />
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <ConvexProvider client={convexClient}>
+      <App />
+    </ConvexProvider>
+  </StrictMode>,
 );
-
-createRoot(document.getElementById("root")!).render(<StrictMode>{tree}</StrictMode>);

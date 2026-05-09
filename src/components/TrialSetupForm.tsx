@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles, Wand2, Play, Gavel } from "lucide-react";
+import { Sparkles, Wand2, Play, Gavel, AlertTriangle } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { SAMPLE_INPUTS } from "../demo/sampleInputs";
 import type { AutonomyLevel, ProductInput } from "../types";
+import { isLiveMode } from "../lib/convexClient";
 import { cn } from "../lib/cn";
 
 const AUTONOMY_OPTIONS: { value: AutonomyLevel; label: string; hint: string }[] = [
@@ -28,6 +31,7 @@ export function TrialSetupForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialDemo = searchParams.get("demo") === "1";
+  const createTrial = useMutation(api.trials.createTrial);
 
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
@@ -38,6 +42,8 @@ export function TrialSetupForm() {
     "requires_approval",
   );
   const [additionalContext, setAdditionalContext] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const applySample = (idx: number) => {
     const s = SAMPLE_INPUTS[idx];
@@ -50,22 +56,22 @@ export function TrialSetupForm() {
     setAdditionalContext(s.additionalContext ?? "");
   };
 
-  const startTrial = (demo: boolean) => {
-    const input: ProductInput = {
-      productName: productName || "Untitled product",
-      productDescription:
-        productDescription ||
-        "We built an AI email assistant that connects to Gmail, reads important emails, and automatically replies on behalf of the user. It decides which emails are urgent, drafts replies, and can send them automatically.",
-      targetUsers: targetUsers || "Builders and product teams",
-      aiActions: aiActions || "User-driven actions; no AI automation",
-      dataAccessed: dataAccessed || "User-provided text",
-      autonomyLevel,
-      additionalContext: additionalContext || undefined,
-    };
+  const buildInput = (): ProductInput => ({
+    productName: productName || "Untitled product",
+    productDescription:
+      productDescription ||
+      "We built an AI email assistant that connects to Gmail, reads important emails, and automatically replies on behalf of the user. It decides which emails are urgent, drafts replies, and can send them automatically.",
+    targetUsers: targetUsers || "Builders and product teams",
+    aiActions: aiActions || "User-driven actions; no AI automation",
+    dataAccessed: dataAccessed || "User-provided text",
+    autonomyLevel,
+    additionalContext: additionalContext || undefined,
+  });
 
+  const navigateToDemoTrial = (input: ProductInput) => {
     const trialId = `trial-${Date.now().toString(36)}`;
     const params = new URLSearchParams();
-    if (demo) params.set("demo", "1");
+    params.set("demo", "1");
     params.set("productName", input.productName);
     params.set("productDescription", input.productDescription);
     params.set("targetUsers", input.targetUsers);
@@ -77,9 +83,36 @@ export function TrialSetupForm() {
     navigate(`/trial/${trialId}?${params.toString()}`);
   };
 
+  const startTrial = async (demo: boolean) => {
+    const input = buildInput();
+    setSubmitError(null);
+
+    if (demo || !isLiveMode) {
+      navigateToDemoTrial(input);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { trialId } = await createTrial({
+        productName: input.productName,
+        productDescription: input.productDescription,
+        targetUsers: input.targetUsers,
+        aiActions: input.aiActions,
+        dataAccessed: input.dataAccessed,
+        autonomyLevel: input.autonomyLevel,
+        additionalContext: input.additionalContext,
+      });
+      navigate(`/trial/${trialId}`);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : String(err));
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    startTrial(initialDemo);
+    void startTrial(initialDemo);
   };
 
   return (
@@ -239,19 +272,38 @@ export function TrialSetupForm() {
           />
         </div>
 
-        <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => startTrial(true)}
-            className="btn-secondary w-full sm:w-auto"
-          >
-            <Play className="h-3.5 w-3.5" />
-            Run demo mode
-          </button>
-          <button type="submit" className="btn-primary w-full sm:w-auto">
-            Start the trial
-            <Sparkles className="h-3.5 w-3.5" />
-          </button>
+        {submitError && (
+          <div className="rounded-xl border border-risk-critical/40 bg-risk-critical/5 px-3 py-2 text-xs text-risk-critical flex items-start gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>{submitError}</span>
+          </div>
+        )}
+
+        <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 pt-2">
+          <p className="text-[11px] text-slate-500">
+            {isLiveMode
+              ? "Live mode active · trials persist in Convex and call OpenAI"
+              : "Demo mode · trials replay from sample data, no API keys needed"}
+          </p>
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => void startTrial(true)}
+              disabled={submitting}
+              className="btn-secondary w-full sm:w-auto"
+            >
+              <Play className="h-3.5 w-3.5" />
+              Run demo mode
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary w-full sm:w-auto"
+            >
+              {submitting ? "Creating trial…" : "Start the trial"}
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </form>
     </div>

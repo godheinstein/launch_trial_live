@@ -1,14 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Play, RefreshCw, Activity } from "lucide-react";
+import {
+  ArrowLeft,
+  Play,
+  RefreshCw,
+  Activity,
+  AlertTriangle,
+} from "lucide-react";
 import { useTrialEngine } from "../lib/useTrialEngine";
+import { useLiveTrial } from "../lib/useLiveTrial";
+import { isLiveMode } from "../lib/convexClient";
 import { sampleTrialResult } from "../demo/runDemoMode";
 import { computeFallbackScore, severityRank } from "../lib/scoring";
 import type {
+  AgentRunState,
   AutonomyLevel,
   ProductInput,
+  RiskCard as RiskCardType,
   Severity,
+  TrialStatus,
+  Verdict,
 } from "../types";
+import type { Id } from "../../convex/_generated/dataModel";
 import { AgentTimeline } from "./AgentTimeline";
 import { RiskCard } from "./RiskCard";
 import { VerdictPanel } from "./VerdictPanel";
@@ -17,6 +30,7 @@ import { BeforeAfterComparison } from "./BeforeAfterComparison";
 import { MarkdownExportButton } from "./MarkdownExportButton";
 import { RiskRadarChart } from "./RiskRadarChart";
 import { RiskFilterBar } from "./RiskFilterBar";
+import { TrialChamber } from "./TrialChamber";
 import { cn } from "../lib/cn";
 
 const ALL_SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
@@ -30,11 +44,29 @@ function autonomyLabel(a: AutonomyLevel): string {
   }[a];
 }
 
+const DEMO_PREFIX = "trial-";
+
+function looksLikeConvexId(id: string | undefined): boolean {
+  if (!id) return false;
+  if (id.startsWith(DEMO_PREFIX)) return false;
+  // Convex IDs are 32 alphanumeric characters
+  return /^[a-z0-9]{20,}$/i.test(id);
+}
+
 export function TrialDashboard() {
   const { trialId } = useParams<{ trialId: string }>();
   const [searchParams] = useSearchParams();
+  const isDemoParam = searchParams.get("demo") === "1";
 
-  const product: ProductInput = useMemo(
+  const useLive =
+    isLiveMode && !isDemoParam && looksLikeConvexId(trialId);
+
+  // Always call both hooks (rules of hooks). The unused one is cheap.
+  const live = useLiveTrial(
+    useLive ? (trialId as Id<"trials">) : null,
+  );
+
+  const productFromParams: ProductInput = useMemo(
     () => ({
       productName:
         searchParams.get("productName") ||
@@ -43,11 +75,9 @@ export function TrialDashboard() {
         searchParams.get("productDescription") ||
         sampleTrialResult.trial.productDescription,
       targetUsers:
-        searchParams.get("targetUsers") ||
-        sampleTrialResult.trial.targetUsers,
+        searchParams.get("targetUsers") || sampleTrialResult.trial.targetUsers,
       aiActions:
-        searchParams.get("aiActions") ||
-        sampleTrialResult.trial.aiActions,
+        searchParams.get("aiActions") || sampleTrialResult.trial.aiActions,
       dataAccessed:
         searchParams.get("dataAccessed") ||
         sampleTrialResult.trial.dataAccessed,
@@ -61,34 +91,77 @@ export function TrialDashboard() {
     [searchParams],
   );
 
-  const isDemoParam = searchParams.get("demo") === "1";
+  const demo = useTrialEngine(trialId ?? "trial", productFromParams);
 
-  const { state, result, runTrial, isRunning } = useTrialEngine(
-    trialId ?? "trial",
-    product,
+  // ----- Adapter: pick the source of truth based on mode -----
+  const product: ProductInput = useLive && live.trial
+    ? {
+        productName: live.trial.productName,
+        productDescription: live.trial.productDescription,
+        targetUsers: live.trial.targetUsers,
+        aiActions: live.trial.aiActions,
+        dataAccessed: live.trial.dataAccessed,
+        autonomyLevel: live.trial.autonomyLevel,
+        additionalContext: live.trial.additionalContext,
+      }
+    : productFromParams;
+
+  const status: TrialStatus = useLive
+    ? live.state.status
+    : demo.state.status;
+  const isRunning = useLive ? live.isRunning : demo.isRunning;
+  const showRetrial = useLive
+    ? live.showRetrial
+    : !!(demo.state.retrialVerdict && demo.state.initialVerdict);
+
+  const initialAgents: AgentRunState[] = useLive
+    ? live.state.initialAgents
+    : demo.state.initialAgents;
+  const retrialAgents: AgentRunState[] = useLive
+    ? live.state.retrialAgents
+    : demo.state.retrialAgents;
+  const initialRisks: RiskCardType[] = useLive
+    ? live.state.initialRisks
+    : demo.state.initialRisks;
+  const retrialRisks: RiskCardType[] = useLive
+    ? live.state.retrialRisks
+    : demo.state.retrialRisks;
+  const initialVerdict: Verdict | undefined = useLive
+    ? live.state.initialVerdict
+    : demo.state.initialVerdict;
+  const retrialVerdict: Verdict | undefined = useLive
+    ? live.state.retrialVerdict
+    : demo.state.retrialVerdict;
+
+  // ----- Local-only state (severity filter and demo-mode selection) -----
+  const [demoSelectedRiskIds, setDemoSelectedRiskIds] = useState<string[]>(
+    [],
   );
-
-  const [selectedRiskIds, setSelectedRiskIds] = useState<string[]>([]);
   const [activeSeverities, setActiveSeverities] = useState<Set<Severity>>(
     () => new Set(ALL_SEVERITIES),
   );
 
+  const selectedRiskIds = useLive
+    ? initialRisks.filter((r) => r.selectedForFix).map((r) => r.id)
+    : demoSelectedRiskIds;
+
+  // Auto-start demo mode trial when ?demo=1 lands on the dashboard
   useEffect(() => {
-    if (isDemoParam && state.status === "draft") {
-      void runTrial("initial");
+    if (!useLive && isDemoParam && demo.state.status === "draft") {
+      void demo.runTrial("initial");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const liveScore = useMemo(() => {
-    if (state.status === "draft") return undefined;
-    if (state.retrialVerdict) return state.retrialVerdict.launchReadinessScore;
-    if (state.initialVerdict) return state.initialVerdict.launchReadinessScore;
-    return computeFallbackScore(state.initialRisks);
-  }, [state]);
+    if (status === "draft") return undefined;
+    if (retrialVerdict) return retrialVerdict.launchReadinessScore;
+    if (initialVerdict) return initialVerdict.launchReadinessScore;
+    if (initialRisks.length > 0) return computeFallbackScore(initialRisks);
+    return undefined;
+  }, [status, initialRisks, initialVerdict, retrialVerdict]);
 
-  const showRetrial = state.retrialVerdict && state.initialVerdict;
-  const risksForList = showRetrial ? state.retrialRisks : state.initialRisks;
+  const risksForList = showRetrial ? retrialRisks : initialRisks;
   const sortedRisks = useMemo(
     () =>
       [...risksForList].sort(
@@ -118,31 +191,79 @@ export function TrialDashboard() {
       return next;
     });
 
-  const toggleRiskFix = (riskId: string) =>
-    setSelectedRiskIds((prev) =>
-      prev.includes(riskId)
-        ? prev.filter((id) => id !== riskId)
-        : [...prev, riskId],
-    );
-
-  const onRetrial = () => {
-    if (selectedRiskIds.length === 0) return;
-    void runTrial("retrial");
+  const toggleRiskFix = (riskId: string) => {
+    if (useLive) {
+      const current = initialRisks.find((r) => r.id === riskId);
+      if (!current) return;
+      void live.toggleRisk(riskId, !current.selectedForFix);
+    } else {
+      setDemoSelectedRiskIds((prev) =>
+        prev.includes(riskId)
+          ? prev.filter((id) => id !== riskId)
+          : [...prev, riskId],
+      );
+    }
   };
 
-  const onRunInitial = () => {
-    setSelectedRiskIds([]);
-    void runTrial("initial");
+  const runInitial = () => {
+    if (useLive) {
+      void live.runTrial("initial");
+    } else {
+      setDemoSelectedRiskIds([]);
+      void demo.runTrial("initial");
+    }
+  };
+
+  const runRetrial = () => {
+    if (selectedRiskIds.length === 0) return;
+    if (useLive) {
+      void live.runTrial("retrial");
+    } else {
+      void demo.runTrial("retrial");
+    }
   };
 
   const trialStatusLabel = (() => {
-    if (state.status === "running") return "Trial in progress";
-    if (state.status === "retrial_running") return "Retrial in progress";
-    if (state.status === "completed") return "Trial complete";
-    if (state.status === "retrial_completed") return "Retrial complete";
-    if (state.status === "error") return "Error";
+    if (status === "running") return "Trial in progress";
+    if (status === "retrial_running") return "Retrial in progress";
+    if (status === "completed") return "Trial complete";
+    if (status === "retrial_completed") return "Retrial complete";
+    if (status === "error") return "Error";
     return "Ready";
   })();
+
+  const result = useLive
+    ? live.result ?? demo.result
+    : demo.result;
+
+  if (useLive && !live.isReady) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
+        <div className="panel p-8">
+          <Activity className="h-5 w-5 text-accent animate-pulse mx-auto" />
+          <p className="mt-3 text-slate-300">Loading trial from Convex…</p>
+          <p className="mt-1 text-xs text-slate-500">trial · {trialId}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (useLive && live.isReady && !live.trial) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
+        <div className="panel p-8">
+          <h1 className="text-xl font-semibold">Trial not found</h1>
+          <p className="mt-2 text-sm text-slate-400">
+            We couldn't find a trial with id <code>{trialId}</code> in this
+            Convex deployment.
+          </p>
+          <Link to="/new" className="btn-primary mt-4 inline-flex">
+            Start a new trial
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
@@ -152,10 +273,10 @@ export function TrialDashboard() {
           New trial
         </Link>
         <div className="flex items-center gap-2">
-          {state.initialVerdict && <MarkdownExportButton result={result} />}
+          {result?.initialVerdict && <MarkdownExportButton result={result} />}
           <button
             type="button"
-            onClick={onRunInitial}
+            onClick={runInitial}
             disabled={isRunning}
             className="btn-secondary"
           >
@@ -164,10 +285,10 @@ export function TrialDashboard() {
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 Running…
               </>
-            ) : state.status === "draft" ? (
+            ) : status === "draft" ? (
               <>
                 <Play className="h-3.5 w-3.5" />
-                Run demo mode
+                {useLive ? "Start trial" : "Run demo mode"}
               </>
             ) : (
               <>
@@ -179,8 +300,14 @@ export function TrialDashboard() {
         </div>
       </div>
 
+      {useLive && live.actionError && (
+        <div className="mb-4 rounded-xl border border-risk-critical/40 bg-risk-critical/5 px-4 py-3 text-sm text-risk-critical flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{live.actionError}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-        {/* Left column: product summary, status, score */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <section className="panel p-5">
             <span className="chip mb-2 text-[10px]">trial · {trialId}</span>
@@ -193,7 +320,10 @@ export function TrialDashboard() {
 
             <dl className="mt-4 space-y-2 text-xs">
               <Row label="Target users" value={product.targetUsers} />
-              <Row label="AI actions" value={product.aiActions} />
+              <Row
+                label="What it does on the user's behalf"
+                value={product.aiActions}
+              />
               <Row label="Data accessed" value={product.dataAccessed} />
               <Row
                 label="Autonomy"
@@ -216,8 +346,8 @@ export function TrialDashboard() {
                     "h-3 w-3",
                     isRunning
                       ? "text-accent animate-pulse"
-                      : state.status === "completed" ||
-                          state.status === "retrial_completed"
+                      : status === "completed" ||
+                          status === "retrial_completed"
                         ? "text-risk-low"
                         : "text-slate-500",
                   )}
@@ -230,51 +360,54 @@ export function TrialDashboard() {
                 <div className="text-[10px] uppercase tracking-wider text-slate-400">
                   Live score
                 </div>
-                <div className="text-3xl font-bold tabular-nums">{liveScore}</div>
+                <div className="text-3xl font-bold tabular-nums">
+                  {liveScore}
+                </div>
               </div>
             )}
           </section>
 
-          {(state.initialRisks.length > 0 || showRetrial) && (
+          {(initialRisks.length > 0 || showRetrial) && (
             <RiskRadarChart
-              initialRisks={state.initialRisks}
-              retrialRisks={
-                showRetrial ? state.retrialRisks : undefined
-              }
+              initialRisks={initialRisks}
+              retrialRisks={showRetrial ? retrialRisks : undefined}
             />
           )}
         </aside>
 
-        {/* Center + right (we'll use a single flowing column on the right) */}
         <div className="space-y-8 min-w-0">
+          <TrialChamber
+            agents={showRetrial ? retrialAgents : initialAgents}
+            risks={showRetrial ? retrialRisks : initialRisks}
+            status={status}
+            verdict={showRetrial ? retrialVerdict : initialVerdict}
+            phase={showRetrial ? "retrial" : "initial"}
+          />
+
           <section>
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400 mb-3">
-              {showRetrial ? "Retrial · the jury" : "The jury"}
+              {showRetrial ? "Retrial · jury timeline" : "Jury timeline"}
             </h2>
-            <AgentTimeline
-              agents={
-                showRetrial ? state.retrialAgents : state.initialAgents
-              }
-            />
+            <AgentTimeline agents={showRetrial ? retrialAgents : initialAgents} />
           </section>
 
-          {state.initialVerdict && !showRetrial && (
+          {initialVerdict && !showRetrial && (
             <section>
-              <VerdictPanel verdict={state.initialVerdict} />
+              <VerdictPanel verdict={initialVerdict} />
             </section>
           )}
 
-          {showRetrial && state.initialVerdict && state.retrialVerdict && (
+          {showRetrial && initialVerdict && retrialVerdict && (
             <>
               <section>
                 <BeforeAfterComparison
-                  initial={state.initialVerdict}
-                  retrial={state.retrialVerdict}
+                  initial={initialVerdict}
+                  retrial={retrialVerdict}
                   appliedFixCount={selectedRiskIds.length}
                 />
               </section>
               <section>
-                <VerdictPanel verdict={state.retrialVerdict} />
+                <VerdictPanel verdict={retrialVerdict} />
               </section>
             </>
           )}
@@ -299,29 +432,44 @@ export function TrialDashboard() {
             </section>
           )}
 
-          {state.initialVerdict && !showRetrial && (
+          {initialVerdict && !showRetrial && (
             <section>
               <FixSelectionPanel
-                risks={state.initialRisks}
+                risks={initialRisks}
                 selectedRiskIds={selectedRiskIds}
                 onToggle={toggleRiskFix}
-                onRetrial={onRetrial}
+                onRetrial={runRetrial}
                 isRetrialing={isRunning}
               />
             </section>
           )}
 
-          {state.status === "draft" && !isDemoParam && (
+          {status === "draft" && !isDemoParam && (
             <div className="panel p-8 text-center">
               <p className="text-slate-300">
-                Click{" "}
-                <span className="text-white font-medium">Run demo mode</span> to
-                replay a sample trial — the email-assistant arc takes about a
-                minute.
+                {useLive ? (
+                  <>
+                    Click{" "}
+                    <span className="text-white font-medium">Start trial</span>{" "}
+                    to run the agents on this product or idea.
+                  </>
+                ) : (
+                  <>
+                    Click{" "}
+                    <span className="text-white font-medium">
+                      Run demo mode
+                    </span>{" "}
+                    to replay a sample trial — the email-assistant arc takes
+                    about a minute.
+                  </>
+                )}
               </p>
-              <p className="mt-2 text-xs text-slate-500">
-                Live mode wires up via Convex once VITE_CONVEX_URL is set.
-              </p>
+              {!useLive && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Live mode is active when VITE_CONVEX_URL is set and trials
+                  are created via the form.
+                </p>
+              )}
             </div>
           )}
         </div>

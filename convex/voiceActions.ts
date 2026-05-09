@@ -6,7 +6,7 @@ import { action } from "./_generated/server";
 /*
  * Voice synthesis actions.
  *
- * Two providers in priority order: Gemini (TODO), ElevenLabs (active).
+ * Two providers in priority order: Gemini (active), ElevenLabs (active).
  * Each returns base64-encoded audio + MIME type so the browser can decode
  * without exposing API keys client-side.
  *
@@ -16,6 +16,8 @@ import { action } from "./_generated/server";
  */
 
 const ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+const GEMINI_VOICE_NAME = "Kore"; // calm, judge-like
 
 interface SynthesisResult {
   provider: "gemini" | "elevenlabs";
@@ -23,11 +25,97 @@ interface SynthesisResult {
   audioBase64: string;
 }
 
-async function tryGemini(_text: string): Promise<SynthesisResult | null> {
-  // TODO: wire google-genai once the simple TTS endpoint is GA.
-  // For now, signal "not configured" by returning null.
-  if (!process.env.GEMINI_API_KEY) return null;
-  return null;
+/**
+ * Wrap raw PCM (16-bit, mono) returned by Gemini in a minimal WAV header so
+ * the browser's <audio> element can play it. Gemini's mimeType looks like
+ * `audio/L16;codec=pcm;rate=24000`.
+ */
+function pcmToWav(pcmBase64: string, sampleRate: number): string {
+  const pcm = Buffer.from(pcmBase64, "base64");
+  const dataSize = pcm.length;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16); // PCM chunk size
+  header.writeUInt16LE(1, 20); // format = PCM
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // byte rate (mono * 16-bit)
+  header.writeUInt16LE(2, 32); // block align
+  header.writeUInt16LE(16, 34); // bits per sample
+  header.write("data", 36);
+  header.writeUInt32LE(dataSize, 40);
+  return Buffer.concat([header, pcm]).toString("base64");
+}
+
+function parseSampleRate(mimeType: string | undefined): number {
+  if (!mimeType) return 24000;
+  const match = mimeType.match(/rate=(\d+)/);
+  return match ? Number(match[1]) : 24000;
+}
+
+async function tryGemini(text: string): Promise<SynthesisResult | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const body = {
+    contents: [
+      {
+        parts: [{ text }],
+      },
+    ],
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: GEMINI_VOICE_NAME,
+          },
+        },
+      },
+    },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Gemini ${res.status}: ${errBody.slice(0, 200)}`);
+  }
+
+  const json = (await res.json()) as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{
+          inlineData?: { data?: string; mimeType?: string };
+        }>;
+      };
+    }>;
+  };
+
+  const part = json.candidates?.[0]?.content?.parts?.find(
+    (p) => p.inlineData?.data,
+  );
+  const inline = part?.inlineData;
+  if (!inline?.data) {
+    throw new Error("Gemini response missing audio data");
+  }
+
+  const sampleRate = parseSampleRate(inline.mimeType);
+  const wavBase64 = pcmToWav(inline.data, sampleRate);
+  return {
+    provider: "gemini",
+    mimeType: "audio/wav",
+    audioBase64: wavBase64,
+  };
 }
 
 async function tryElevenLabs(text: string): Promise<SynthesisResult | null> {
