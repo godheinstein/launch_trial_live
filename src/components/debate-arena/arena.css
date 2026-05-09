@@ -1,0 +1,43 @@
+/**
+ * arena.css
+ * Debate Arena — Custom animations and utility classes.
+ * Import this file in your app entry (e.g., main.tsx or index.css):
+ *
+ *   import "./components/debate-arena/arena.css";
+ */
+
+/* Arena-specific keyframes */
+@keyframes arena-pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes arena-ring-expand {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+/* Animation utility classes */
+.arena-pulse-glow {
+  animation: arena-pulse-glow 2s ease-in-out infinite;
+}
+
+.arena-ring-expand {
+  animation: arena-ring-expand 2s ease-out infinite;
+}
+
+/* Frosted glass panel for controls */
+.arena-glass-panel {
+  background: rgba(15, 18, 35, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(100, 120, 180, 0.15);
+}
+
+/* Agent accent color CSS custom properties (optional, for advanced theming) */
+.agent-malicious { --agent-color: #dc2626; }
+.agent-privacy { --agent-color: #06b6d4; }
+.agent-confused { --agent-color: #eab308; }
+.agent-injection { --agent-color: #a855f7; }
+.agent-investor { --agent-color: #22c55e; }
+.agent-judge { --agent-color: #c084fc; }
