@@ -7,7 +7,7 @@ TrialRun helps builders stress-test any product or idea with AI agents that simu
 ---
 
 **Live app:** https://launchtriallive.vercel.app/
-**Demo video:** _coming soon_ &nbsp;·&nbsp; **Hackathon:** AIE Hackathon
+**Demo video:** https://youtu.be/f9OG6Eo4oIY &nbsp;·&nbsp; **Hackathon:** AIE Hackathon
 
 ---
 
