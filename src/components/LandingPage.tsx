@@ -122,20 +122,20 @@ export function LandingPage() {
       </motion.div>
 
       {/* ===== Powered by — sits directly below the CTAs ===== */}
-      <div className="mt-10">
-        <div className="text-center mb-6">
+      <div className="mt-6">
+        <div className="text-center mb-4">
           <span className="inline-block text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
             Powered by
           </span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
           {SPONSORS.map(({ name, role, Logo, accent }, i) => (
             <motion.div
               key={name}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.05 * i }}
-              className="group relative flex items-center gap-3 rounded-xl border border-border bg-bg-elevated/40 px-4 py-3 transition-colors hover:border-border-strong hover:bg-bg-elevated/70"
+              className="group relative flex items-start gap-3 rounded-xl border border-border bg-bg-elevated/40 px-4 py-3 transition-colors hover:border-border-strong hover:bg-bg-elevated/70"
             >
               <span
                 aria-hidden
@@ -145,23 +145,23 @@ export function LandingPage() {
                 }}
               />
               <div
-                className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/5 bg-black/30"
+                className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/5 bg-black/30 mt-0.5"
                 style={{ color: accent }}
               >
                 <Logo className="h-5 w-5" />
               </div>
-              <div className="relative min-w-0">
-                <div className="text-sm font-semibold tracking-tight text-slate-100 truncate">
+              <div className="relative min-w-0 flex-1">
+                <div className="text-sm font-semibold tracking-tight text-slate-100 leading-tight">
                   {name}
                 </div>
-                <div className="text-[10.5px] uppercase tracking-wider text-slate-400 truncate">
+                <div className="text-[10.5px] uppercase tracking-wider text-slate-400 leading-snug mt-0.5">
                   {role}
                 </div>
               </div>
             </motion.div>
           ))}
         </div>
-        <p className="mt-4 text-center text-[11px] text-slate-500">
+        <p className="mt-3 text-center text-[11px] text-slate-500">
           Logos shown are trademarks of their respective owners.
         </p>
       </div>

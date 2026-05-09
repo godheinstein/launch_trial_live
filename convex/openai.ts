@@ -1,5 +1,19 @@
 "use node";
 
+/*
+ * ============================================================================
+ *   SPONSOR INTEGRATION — OpenAI
+ * ============================================================================
+ *   Server-side OpenAI client. Used by `convex/runner.ts` to drive the
+ *   six-agent debate (5 specialists + final judge). All calls use OpenAI's
+ *   structured-output mode (`response_format: json_schema`) so model output
+ *   conforms to the schemas in `convex/prompts.ts` before persistence.
+ *
+ *   Key:    process.env.OPENAI_API_KEY  (set in Convex dashboard)
+ *   Model:  gpt-5.5  with automatic fallback to gpt-4o-2024-08-06 on 404.
+ * ============================================================================
+ */
+
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL = "gpt-5.5";
 const FALLBACK_MODEL = "gpt-4o-2024-08-06";
